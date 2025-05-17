@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+
 @Entity
 @Table(name = "utilisateurs")
 @NoArgsConstructor
@@ -21,8 +22,8 @@ import lombok.Setter;
 )
 
 @JsonSubTypes({
-        @JsonSubTypes.Type(value = AdminisateurClient.class, name = "AdminisateurClient"),
-        @JsonSubTypes.Type(value = SuperAdminisateur.class, name = "SuperAdminisateur"),
+        @JsonSubTypes.Type(value = AdministrateurClient.class, name = "AdministrateurClient"),
+        @JsonSubTypes.Type(value = SuperAdministrateur.class, name = "SuperAdminisateur"),
         @JsonSubTypes.Type(value = AgentInventaire.class, name = "AgentInventaire")
 })
 
@@ -35,6 +36,16 @@ public class Utilisateur {
     private String email;
     private String password;
     private String telephone;
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
 
     public Long getId() {
         return id;

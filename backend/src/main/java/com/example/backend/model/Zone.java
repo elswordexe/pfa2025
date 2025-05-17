@@ -1,5 +1,6 @@
 package com.example.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -13,15 +14,15 @@ import java.util.List;
 @Entity
 @Table(name = "zones")
 @AllArgsConstructor
-@NoArgsConstructor
 @Getter
 @Setter
+
 public class Zone {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
     private String name;
-    @JsonManagedReference
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "zone_produits",
@@ -29,4 +30,16 @@ public class Zone {
             inverseJoinColumns = @JoinColumn(name = "produit_id")
     )
     private List<Produit> produits=new ArrayList<>();
+
+    public Zone() {
+    }
+
+    public Zone(long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public Zone(String name) {
+        this.name = name;
+    }
 }

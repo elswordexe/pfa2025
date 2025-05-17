@@ -1,20 +1,36 @@
 package com.example.backend.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.*;
 
-@Data
 @Entity
+@Table(name = "ecarts")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Ecart {
     @Id
-    @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String type;
-    private double seuilcritique;
+
+    @Column(nullable = false)
+    private Integer quantiteTheorique;
+
+    @Column(nullable = false)
+    private Integer quantiteComptee;
+
+    @Column(nullable = false)
+    private Integer ecartQuantite;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private EcartType type;
+
+    private String justification;
+
+    @Column(nullable = false)
+    private boolean valide;
+
+    private boolean demandeRecomptage;
 }

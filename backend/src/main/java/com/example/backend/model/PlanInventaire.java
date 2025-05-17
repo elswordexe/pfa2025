@@ -1,7 +1,6 @@
 package com.example.backend.model;
 
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
@@ -21,7 +20,6 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
 import lombok.*;
-import java.util.HashMap;
 
 
 @Entity
@@ -74,4 +72,12 @@ public class PlanInventaire {
     )
     @MapKeyJoinColumn(name = "zone_id")
     private Map<Zone, Ecart> ecarts = new HashMap<>();
+    @OneToMany
+    @JoinTable(
+            name = "plan_zones",
+            joinColumns = @JoinColumn(name = "plan_id"),
+            inverseJoinColumns = @JoinColumn(name = "zone_id")
+    )
+    private List<Zone> zones = new ArrayList<>();
+
 }
