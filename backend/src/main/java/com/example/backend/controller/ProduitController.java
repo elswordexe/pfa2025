@@ -92,18 +92,13 @@ public class ProduitController {
         List<Produit> results;
         
         if (keyword != null && !keyword.trim().isEmpty()) {
-            // Recherche par mot-clé
             results = produitRepository.findByNomContainingOrDescriptionContainingOrCodeBarContainingOrReferenceContaining(
                     keyword, keyword, keyword, keyword);
         } else if (categoryId != null) {
-            // Recherche par catégorie
             results = produitRepository.findByCategoryId(categoryId);
         } else {
-            // Par défaut, retourner tous les produits
             results = produitRepository.findAll();
         }
-        
-        // Filtrer par prix si spécifié
         if (minPrice != null || maxPrice != null) {
             double minPriceValue = minPrice != null ? minPrice : 0;
             double maxPriceValue = maxPrice != null ? maxPrice : Double.MAX_VALUE;
@@ -124,5 +119,11 @@ public class ProduitController {
     public ResponseEntity<List<String>> getUnitesOfMeasure() {
         List<String> unites = produitRepository.findDistinctUnites();
         return ResponseEntity.ok(unites);
+    }
+    @Operation(summary = "afficher par code barecode scannée ")
+    @ApiResponses(value={@ApiResponse(responseCode = "200",description = "lister les données du produit scannée avec succes"),@ApiResponse(responseCode = "404",description = "erreur survenue produit non trouvee ou bien veuillez scanner de nouveau")})
+    @GetMapping("Produits/{barreCode}")
+    public Produit getByBareCode(@PathVariable String codeBar){
+        return produitRepository.findByCodeBar(codeBar).orElse(null);
     }
 }
