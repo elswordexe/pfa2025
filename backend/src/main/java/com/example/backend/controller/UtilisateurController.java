@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -103,26 +104,28 @@ public class UtilisateurController {
         String password = loginRequest.get("password");
 
         Optional<Utilisateur> userOpt = utilisateurRepository.findByEmail(email);
-        
+
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Email ou mot de passe incorrect"));
         }
         Utilisateur user = userOpt.get();
         if (passwordEncoder.matches(password, user.getPassword())) {
-            return ResponseEntity.ok(Map.of(
-                "message", "Connexion réussie",
-                "user", Map.of(
-                    "id", user.getId(),
-                    "nom", user.getNom(),
-                    "prenom", user.getPrenom(),
-                    "email", user.getEmail(),
-                    "role", user.getRole()
-                )
-            ));
+            Map<String, Object> userMap = new HashMap<>();
+            userMap.put("id", user.getId());
+            userMap.put("nom", user.getNom());
+            userMap.put("prenom", user.getPrenom());
+            userMap.put("email", user.getEmail());
+            userMap.put("role", user.getRole());
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("message", "Connexion réussie");
+            responseMap.put("user", userMap);
+
+            return ResponseEntity.ok(responseMap);
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Email ou mot de passe incorrect"));
         }
     }
+
     
     @Operation(summary = "déconnexion d'utilisateur")
     @ApiResponses(value = {
