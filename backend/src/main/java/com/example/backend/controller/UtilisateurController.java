@@ -13,6 +13,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import com.example.backend.service.JwtService;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +27,12 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 @Tag(name = "Utilisateur Management", description = "APIs pour manager les utilisateurs")
 public class UtilisateurController {
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private JwtService jwtService;
+
     @Autowired
     private UtilisateurRepository utilisateurRepository;
     
@@ -103,30 +113,46 @@ public class UtilisateurController {
         String email = loginRequest.get("email");
         String password = loginRequest.get("password");
 
-        Optional<Utilisateur> userOpt = utilisateurRepository.findByEmail(email);
+        try {
+            // Authenticate with Spring Security
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, password)
+            );
 
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Email ou mot de passe incorrect"));
-        }
-        Utilisateur user = userOpt.get();
-        if (passwordEncoder.matches(password, user.getPassword())) {
+            // If authentication successful, find user
+            Optional<Utilisateur> userOpt = utilisateurRepository.findByEmail(email);
+
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("message", "Email ou mot de passe incorrect"));
+            }
+
+            // Generate JWT token
+            Utilisateur user = userOpt.get();
+            String jwtToken = jwtService.generateToken(user);
             Map<String, Object> userMap = new HashMap<>();
             userMap.put("id", user.getId());
             userMap.put("nom", user.getNom());
             userMap.put("prenom", user.getPrenom());
             userMap.put("email", user.getEmail());
-            userMap.put("role", user.getRole());
+            userMap.put("role", user.getRole() != null ? user.getRole() : Role.Utilisateur);
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("message", "Connexion réussie");
             responseMap.put("user", userMap);
+            responseMap.put("token", jwtToken);
 
             return ResponseEntity.ok(responseMap);
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", "Email ou mot de passe incorrect"));
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Email ou mot de passe incorrect"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Erreur lors de la connexion: " + e.getMessage()));
         }
     }
 
-    
+
+
     @Operation(summary = "déconnexion d'utilisateur")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "déconnexion réussie")

@@ -42,7 +42,7 @@ public class PlanInventaire {
     
     @Temporal(TemporalType.TIMESTAMP)
     private Date datefin;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private STATUS status;
@@ -50,7 +50,7 @@ public class PlanInventaire {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TYPE type;
-    
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RECCURENCE reccurence;

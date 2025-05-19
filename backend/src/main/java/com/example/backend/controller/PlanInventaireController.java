@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -40,7 +41,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "lister les infos du plan avec succès"),
             @ApiResponse(responseCode = "404", description = "plan introuvables")
     })
-    @GetMapping("Plan/{planId}")
+    @GetMapping("Plans/{planId}")
     public ResponseEntity<PlanInventaire> getPlanById(@PathVariable Long planId) {
         return planInventaireRepository.findById(planId)
                 .map(ResponseEntity::ok)
@@ -51,7 +52,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "plan enregistré avec succès"),
             @ApiResponse(responseCode = "400", description = "Donnéesdu planr invalides")
     })
-    @PostMapping("Plan/ajout")
+    @PostMapping("Plans/ajout")
     public ResponseEntity<?> ajouterPlan(@RequestBody PlanInventaire planInventaire) {
         PlanInventaire plan = planInventaireRepository.save(planInventaire);
         return ResponseEntity.ok(plan);
@@ -62,7 +63,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "plan deleted avec succès"),
             @ApiResponse(responseCode = "400", description = "introuvable")
     })
-    @DeleteMapping("Plan/{planId}")
+    @DeleteMapping("Plans/{planId}")
     public ResponseEntity<?> supprimerPlan(@PathVariable Long planId) {
         planInventaireRepository.deleteById(planId);
         return ResponseEntity.ok().build();
@@ -72,7 +73,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "mise a jour du plan avec succès"),
             @ApiResponse(responseCode = "400", description = "errur")
     })
-    @PutMapping("Plan/{planId}")
+    @PutMapping("Plans/{planId}")
     public ResponseEntity<?> modifierPlan(@PathVariable Long planId, @RequestBody PlanInventaire planInventaire) {
         if (!planId.equals(planInventaire.getId())) {
             return ResponseEntity.badRequest().build();
@@ -85,7 +86,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "Utilisateur enregistré avec succès"),
             @ApiResponse(responseCode = "400", description = "Données d'utilisateur invalides")
     })
-    @PostMapping("/plans/{planId}/agents/{agentId}/assignations")
+    @PostMapping("Plans/{planId}/agents/{agentId}/assignations")
     public ResponseEntity<?> assignerAgents(@PathVariable Long planId,
                                           @PathVariable Long agentId,
                                           @RequestBody Zone zone,
@@ -133,7 +134,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "lister avec succes"),
             @ApiResponse(responseCode = "400", description = "erreur")
     })
-    @GetMapping("/plans/{planId}/assignations")
+    @GetMapping("Plans/{planId}/assignations")
     public ResponseEntity<List<AssignationAgent>> getAssignations(@PathVariable Long planId) {
         return ResponseEntity.ok(assignationAgentRepository.findByPlanInventaireId(planId));
     }
@@ -142,7 +143,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "lister avec succes"),
             @ApiResponse(responseCode = "400", description = "erreur")
     })
-    @GetMapping("/plans/{planId}/zones")
+    @GetMapping("Plans/{planId}/zones")
     public ResponseEntity<List<Zone>> getZonesForPlan(@PathVariable Long planId) {
         return planInventaireRepository.findById(planId)
                 .map(plan -> ResponseEntity.ok(plan.getZones()))
@@ -153,7 +154,7 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "200", description = "ajouter des zones avec succès"),
             @ApiResponse(responseCode = "400", description = "erreur")
     })
-    @PostMapping("/plans/{planId}/zones")
+    @PostMapping("Plans/{planId}/zones")
     public ResponseEntity<?> addZonesToPlan(@PathVariable Long planId, @RequestBody List<Zone> zones) {
         try {
             PlanInventaire plan = planInventaireRepository.findById(planId)
