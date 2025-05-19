@@ -27,7 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
-            @Qualifier("userDetailsServiceBean") UserDetailsService userDetailsService, // Using qualifier
+            @Qualifier("userDetailsServiceBean") UserDetailsService userDetailsService,
             HandlerExceptionResolver handlerExceptionResolver
     ) {
         this.jwtService = jwtService;

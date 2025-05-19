@@ -76,11 +76,7 @@ public class Utilisateur implements UserDetails {
     }
 
     public Role getRole() {
-        return role != null ? role : Role.Utilisateur;  // Never return null
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
+        return role != null ? role : Role.Utilisateur;
     }
 
     public Utilisateur(String nom, String prenom, String email) {
