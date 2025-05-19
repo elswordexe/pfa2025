@@ -20,7 +20,7 @@ import java.util.Optional;
 
 @RestController
 @CrossOrigin(origins = "*")
-@Tag(name = "User Management", description = "APIs for managing users")
+@Tag(name = "Utilisateur Management", description = "APIs pour manager les utilisateurs")
 public class UtilisateurController {
     @Autowired
     private UtilisateurRepository utilisateurRepository;
