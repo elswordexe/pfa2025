@@ -123,7 +123,7 @@ public class ProduitController {
     @Operation(summary = "afficher par code barecode scannée ")
     @ApiResponses(value={@ApiResponse(responseCode = "200",description = "lister les données du produit scannée avec succes"),@ApiResponse(responseCode = "404",description = "erreur survenue produit non trouvee ou bien veuillez scanner de nouveau")})
     @GetMapping("Produits/{barreCode}")
-    public Produit getByBareCode(@PathVariable String codeBar){
-        return produitRepository.findByCodeBar(codeBar).orElse(null);
+    public Produit getByBareCode(@PathVariable String barreCode){
+        return produitRepository.findByCodeBar(barreCode).orElse(null);
     }
 }
