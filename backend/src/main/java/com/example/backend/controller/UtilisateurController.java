@@ -151,8 +151,23 @@ public class UtilisateurController {
         }
     }
 
+    @Operation(summary="lister nombres d'Utilisateur")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "nombre")
+    })
+    @GetMapping("users/count")
+    public ResponseEntity<Integer> getCountUtilisateurs() {
+        return ResponseEntity.ok((int) utilisateurRepository.count());
+    }
 
-
+    @Operation(summary="Compter le nombre d'agents d'inventaire")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Nombre d'agents d'inventaire")
+    })
+    @GetMapping("users/countAgentInventaire")
+    public ResponseEntity<Long> getCountAgent() {
+        return ResponseEntity.ok(utilisateurRepository.countByRole(Role.AGENT_INVENTAIRE));
+    }
     @Operation(summary = "déconnexion d'utilisateur")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "déconnexion réussie")
