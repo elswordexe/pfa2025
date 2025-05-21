@@ -27,13 +27,13 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity // Enable @PreAuthorize and @PostAuthorize annotations
+@EnableMethodSecurity
 public class SecurityConfig {
     
     private final UtilisateurRepository utilisateurRepository;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // Constructor injection instead of field injection
+
     public SecurityConfig(UtilisateurRepository utilisateurRepository, JwtAuthenticationFilter jwtAuthenticationFilter) {
         this.utilisateurRepository = utilisateurRepository;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
@@ -48,28 +48,28 @@ public class SecurityConfig {
                     .requestMatchers("/users/login", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                     
                     // User management
-                    .requestMatchers(HttpMethod.GET, "/users").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers("/users/client-admin/**").hasRole("SUPER_ADMIN")
-                    .requestMatchers("/users/agent-inventaire/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.GET, "/users").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers("/users/client-admin/**").hasAnyAuthority("SUPER_ADMIN")
+                    .requestMatchers("/users/agent-inventaire/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                     // Client management
-                    .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "/api/clients/**").hasRole("SUPER_ADMIN")
-                    .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasRole("SUPER_ADMIN")
-                    .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasRole("SUPER_ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                    .requestMatchers(HttpMethod.POST, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
+                    .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
+                    .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
                         //Categ
-                    .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/produits/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "/api/categories/**", "/api/produits/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.PUT, "/api/categories/**", "/api/produits/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.DELETE, "/api/categories/**", "/api/produits/**").hasRole("SUPER_ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                    .requestMatchers(HttpMethod.POST, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.PUT, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.DELETE, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN")
                         //plans
-                    .requestMatchers(HttpMethod.GET, "Plans/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "Plans/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.PUT, "Plans/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.GET, "Plans/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                    .requestMatchers(HttpMethod.POST, "Plans/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.PUT, "Plans/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                     // Zone manage
-                    .requestMatchers(HttpMethod.GET, "/api/zones/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "/api/zones/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.PUT, "/api/zones/**").hasAnyRole("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.DELETE, "/api/zones/**").hasRole("SUPER_ADMIN")
+                    .requestMatchers(HttpMethod.GET, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                    .requestMatchers(HttpMethod.POST, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.PUT, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                    .requestMatchers(HttpMethod.DELETE, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN")
                     //lkhrin authaut
                     .anyRequest().authenticated()
             )
