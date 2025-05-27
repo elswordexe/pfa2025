@@ -32,7 +32,7 @@ public class CategoryController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(rootCategories);
     }
-    @Operation(summary="creation ert ertet" ,description="Api des categories")
+    @Operation(summary="creation des categories" ,description="Api des categories")
     @ApiResponse(responseCode = "200", description = "categories list")
     @PostMapping
     public ResponseEntity<Category> createCategory(@RequestBody Category category) {

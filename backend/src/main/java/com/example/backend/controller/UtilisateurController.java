@@ -22,6 +22,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -165,8 +169,9 @@ public class UtilisateurController {
             @ApiResponse(responseCode = "200", description = "Nombre d'agents d'inventaire")
     })
     @GetMapping("users/countAgentInventaire")
-    public ResponseEntity<Long> getCountAgent() {
-        return ResponseEntity.ok(utilisateurRepository.countByRole(Role.AGENT_INVENTAIRE));
+    public ResponseEntity<Integer> getCountAgentInventaire() {
+        long count = utilisateurRepository.countByRole(Role.AGENT_INVENTAIRE);
+        return ResponseEntity.ok((int) count);
     }
     @Operation(summary = "déconnexion d'utilisateur")
     @ApiResponses(value = {
@@ -176,4 +181,33 @@ public class UtilisateurController {
     public ResponseEntity<?> logoutUser() {
         return ResponseEntity.ok(Map.of("message", "Déconnexion réussie"));
     }
+    @Operation(summary = "Obtenir les noms et dates de modification des utilisateurs")
+@ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Liste récupérée avec succès"),
+        @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la récupération des données")
+})
+@GetMapping("users/names-dates")
+public ResponseEntity<List<Map<String, Object>>> getUsersNameAndDate(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size) {
+    try {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Utilisateur> userPage = utilisateurRepository.findAll(pageable);
+        
+        List<Map<String, Object>> usersData = userPage.getContent().stream()
+                .map(user -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("id", user.getId());
+                    data.put("name", user.getNom());
+                    data.put("date", user.getDatecremod());
+                    return data;
+                })
+                .collect(Collectors.toList());
+                
+        return ResponseEntity.ok(usersData);
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(List.of());
+    }
+}
 }

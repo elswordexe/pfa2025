@@ -1,7 +1,7 @@
 package com.example.backend.model;
 
 public enum STATUS {
-    EPUISE,
-    ENSTOCK,
-    CAPPRO;
+    EN_cours,
+    Termine,
+    Indefini;
 }

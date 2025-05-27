@@ -1,24 +1,42 @@
 package com.example.backend.controller;
 
+import com.example.backend.model.Category;
 import com.example.backend.model.Produit;
+import com.example.backend.model.Utilisateur;
+import com.example.backend.model.Zone;
 import com.example.backend.repository.ProduitRepository;
+import com.example.backend.repository.ZoneRepository;
+import com.example.backend.service.ProduitImageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @CrossOrigin(origins = "*")
 @Tag(name = "controller des Produits", description = "APIs des Produits")
 public class ProduitController {
     @Autowired
+    private ProduitImageService produitImageService;
+    @Autowired
     ProduitRepository produitRepository;
-    
+    @Autowired
+    ZoneRepository zoneRepository;
     @Operation(summary = "Lister tous les Produit")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "lister les produits avec succès"),
@@ -38,16 +56,90 @@ public class ProduitController {
         return produitRepository.findById(produitId).orElse(null);
     }
 
-    @Operation(summary = "Ajout d'un nouveau produit")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Produit ajouté avec succès"),
-            @ApiResponse(responseCode = "400", description = "Données invalides")
-    })
-    @PostMapping("Produits/register")
-    public ResponseEntity<?> registerProduit(@RequestBody Produit produit){
-        Produit produit1 = produitRepository.save(produit);
-        return ResponseEntity.ok(produit1);
+@Operation(summary = "Ajout d'un nouveau produit")
+@ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Produit ajouté avec succès"),
+        @ApiResponse(responseCode = "400", description = "Données invalides")
+})
+@PostMapping("Produits/register")
+@Transactional
+public ResponseEntity<?> registerProduit(@RequestBody Map<String, Object> requestMap) {
+    try {
+        Produit produit = new Produit();
+
+        if (requestMap.containsKey("nom")) produit.setNom((String) requestMap.get("nom"));
+        if (requestMap.containsKey("prix")) {
+            Object prixObj = requestMap.get("prix");
+            if (prixObj instanceof Number) {
+                produit.setPrix(((Number) prixObj).doubleValue());
+            } else if (prixObj instanceof String) {
+                produit.setPrix(Double.parseDouble((String) prixObj));
+            }
+        }
+        if (requestMap.containsKey("unite")) produit.setUnite((String) requestMap.get("unite"));
+        if (requestMap.containsKey("description")) produit.setDescription((String) requestMap.get("description"));
+        if (requestMap.containsKey("reference")) produit.setReference((String) requestMap.get("reference"));
+        if (requestMap.containsKey("codeBar")) produit.setCodeBar((String) requestMap.get("codeBar"));
+        if (requestMap.containsKey("imageUrl")) produit.setImageUrl((String) requestMap.get("imageUrl"));
+        
+
+        if (requestMap.containsKey("category") && requestMap.get("category") != null) {
+            Map<String, Object> categoryMap = (Map<String, Object>) requestMap.get("category");
+            if (categoryMap.containsKey("id")) {
+                Category category = new Category();
+                category.setId(Long.valueOf(categoryMap.get("id").toString()));
+                produit.setCategory(category);
+            }
+        }
+        produit.setZones(new ArrayList<>());
+        Produit savedProduit = produitRepository.save(produit);
+
+        List<Long> zoneIds = new ArrayList<>();
+
+        if (requestMap.containsKey("zone") && requestMap.get("zone") != null) {
+            Map<String, Object> zoneMap = (Map<String, Object>) requestMap.get("zone");
+            if (zoneMap.containsKey("id")) {
+                zoneIds.add(Long.valueOf(zoneMap.get("id").toString()));
+            }
+        }
+        if (requestMap.containsKey("zones") && requestMap.get("zones") != null) {
+            List<Map<String, Object>> zonesList = (List<Map<String, Object>>) requestMap.get("zones");
+            for (Map<String, Object> zoneMap : zonesList) {
+                if (zoneMap.containsKey("id")) {
+                    zoneIds.add(Long.valueOf(zoneMap.get("id").toString()));
+                }
+            }
+        }
+
+        for (Long zoneId : zoneIds) {
+            Optional<Zone> existingZone = zoneRepository.findById(zoneId);
+            if (existingZone.isPresent()) {
+                Zone actualZone = existingZone.get();
+                if (actualZone.getProduits() == null) {
+                    actualZone.setProduits(new ArrayList<>());
+                }
+                if (!actualZone.getProduits().contains(savedProduit)) {
+                    actualZone.getProduits().add(savedProduit);
+                }
+                if (savedProduit.getZones() == null) {
+                    savedProduit.setZones(new ArrayList<>());
+                }
+                if (!savedProduit.getZones().contains(actualZone)) {
+                    savedProduit.getZones().add(actualZone);
+                }
+
+                zoneRepository.save(actualZone);
+            }
+        }
+        savedProduit = produitRepository.save(savedProduit);
+        
+        return ResponseEntity.ok(savedProduit);
+        
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.badRequest().body("Erreur lors de l'ajout du produit: " + e.getMessage());
     }
+}
 
     @Operation(summary = "Supprimer un produit")
     @ApiResponses(value = {
@@ -126,4 +218,77 @@ public class ProduitController {
     public Produit getByBareCode(@PathVariable String barreCode){
         return produitRepository.findByCodeBar(barreCode).orElse(null);
     }
+    @Operation(summary ="Obetenir nombre des produits")
+    @ApiResponses(value={ @ApiResponse(responseCode = "200", description = "lister nombre des produits"),})
+    @GetMapping("Produits/count")
+    public Long getProduitCount(){
+       return  produitRepository.count();
+    }
+    @Operation(summary = "Obtenir des produits par zone")
+@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Liste des produits par zone"), })
+@GetMapping("Produits/byZone/{id}")
+public List<Produit> getProduitsByZone(@PathVariable Long id) {
+    Optional<Zone> zone = zoneRepository.findById(id);
+    return zone.map(Zone::getProduits).orElse(List.of());
+}
+    @PostMapping("Produits/{produitId}/image")
+    public ResponseEntity<?> uploadProductImage(
+            @PathVariable("produitId") Long produitId,
+            @RequestParam("image") MultipartFile file) throws IOException {
+
+        String response = produitImageService.uploadProductImage(produitId, file);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(response);
+    }
+
+    @GetMapping("Produits/{produitId}/image")
+    public ResponseEntity<?> getProductImage(@PathVariable("produitId") Long produitId) {
+        byte[] image = produitImageService.getProductImage(produitId);
+
+        return ResponseEntity.status(HttpStatus.OK)
+                .contentType(MediaType.IMAGE_JPEG)
+                .body(image);
+    }
+@Operation(summary = "Obtenir les noms, dates et images des produits")
+@ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Liste récupérée avec succès"),
+        @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la récupération des données")
+})
+@GetMapping("Produits/names-dates")
+public ResponseEntity<List<Map<String, Object>>> getProduitsNameAndDate(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size) {
+    try {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Produit> produitPage = produitRepository.findAll(pageable);
+
+        List<Map<String, Object>> produitsData = produitPage.getContent().stream()
+                .map(produit -> {
+                    Map<String, Object> data = new HashMap<>();
+                    data.put("id", produit.getId());
+                    data.put("name", produit.getNom());
+                    data.put("date", produit.getDatecremod());
+                    data.put("imageUrl", produit.getImageUrl());
+                    if (produit.getId() != null && produit.getImageUrl() != null && !produit.getImageUrl().isEmpty()) {
+                        try {
+                            byte[] imageData = produitImageService.getProductImage(produit.getId());
+                            String base64Image = Base64.getEncoder().encodeToString(imageData);
+                            data.put("imageData", base64Image);
+                        } catch (Exception e) {
+                            System.err.println("Could not retrieve image for product " + produit.getId() + ": " + e.getMessage());
+                        }
+                    }
+                    
+                    return data;
+                })
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(produitsData);
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(List.of());
+    }
+}
 }

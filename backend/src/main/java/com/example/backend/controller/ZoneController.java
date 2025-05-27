@@ -31,7 +31,7 @@ public class ZoneController {
     @ApiResponses(value =
             @ApiResponse(responseCode = "200", description = "liste de zones")
     )
-    @GetMapping("Zones")
+    @GetMapping("Zone/all")
     public Iterable<Zone> getAllZones(){
         return zoneRepository.findAll();
     }
@@ -125,5 +125,9 @@ public class ZoneController {
         
         Zone updatedZone = zoneRepository.save(zone);
         return ResponseEntity.ok(updatedZone);
+    }
+    @GetMapping("Zone/count")
+    public Long getZoneCount(){
+        return zoneRepository.count();
     }
 }

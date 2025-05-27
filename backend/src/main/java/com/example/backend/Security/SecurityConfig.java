@@ -38,48 +38,16 @@ public class SecurityConfig {
         this.utilisateurRepository = utilisateurRepository;
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/users/login", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                    
-                    // User management
-                    .requestMatchers(HttpMethod.GET, "/users").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers("/users/client-admin/**").hasAnyAuthority("SUPER_ADMIN")
-                    .requestMatchers("/users/agent-inventaire/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    // Client management
-                    .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
-                    .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
-                    .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
-                        //Categ
-                    .requestMatchers(HttpMethod.GET, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.PUT, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.DELETE, "/api/categories/**", "/api/produits/**").hasAnyAuthority("SUPER_ADMIN")
-                        //plans
-                    .requestMatchers(HttpMethod.GET, "Plans/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "Plans/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.PUT, "Plans/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    // Zone manage
-                    .requestMatchers(HttpMethod.GET, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                    .requestMatchers(HttpMethod.POST, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.PUT, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                    .requestMatchers(HttpMethod.DELETE, "/api/zones/**").hasAnyAuthority("SUPER_ADMIN")
-                    //lkhrin authaut
-                    .anyRequest().authenticated()
-            )
-            .sessionManagement(session -> session
-                    .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-            .build();
-}
+                        .anyRequest().permitAll()
+                )
+                .build();
+    }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {

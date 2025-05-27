@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,9 +24,9 @@ public class Produit {
     
     private double prix;
     private String unite;
-    
+    private LocalDateTime datecremod;
     private String imageUrl;
-    
+
     @ManyToOne
     @JoinColumn(name = "category_id")
     private Category category;
@@ -33,4 +34,5 @@ public class Produit {
     @ManyToMany(mappedBy = "produits")
     @JsonIgnore
     private List<Zone> zones = new ArrayList<>();
+
 }

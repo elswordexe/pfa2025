@@ -1,5 +1,6 @@
 package com.example.backend.model;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 import jakarta.persistence.CascadeType;
@@ -54,7 +55,9 @@ public class PlanInventaire {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RECCURENCE reccurence;
-    
+
+    private LocalDateTime datecremod;
+
     @ElementCollection
     @CollectionTable(
         name = "quantites_comptees",
