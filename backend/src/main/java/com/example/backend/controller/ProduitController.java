@@ -2,15 +2,17 @@ package com.example.backend.controller;
 
 import com.example.backend.model.Category;
 import com.example.backend.model.Produit;
-import com.example.backend.model.Utilisateur;
 import com.example.backend.model.Zone;
 import com.example.backend.repository.ProduitRepository;
 import com.example.backend.repository.ZoneRepository;
 import com.example.backend.service.ProduitImageService;
+import com.example.backend.util.ExportUtil;
+import com.itextpdf.text.DocumentException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -291,4 +293,29 @@ public ResponseEntity<List<Map<String, Object>>> getProduitsNameAndDate(
                 .body(List.of());
     }
 }
+    @GetMapping("Produits/export-csv")
+    public void exportToCsv(HttpServletResponse response) throws IOException {
+        List<Produit> produits = produitRepository.findAll();
+        ExportUtil.ProduitCsvExportUtils csvExporter = new ExportUtil.ProduitCsvExportUtils(produits);
+        csvExporter.exportDataToCsv(response);
+    }
+
+    @GetMapping("Produits/export-excel")
+    public void exportToExcel(HttpServletResponse response) throws IOException {
+        List<Produit> produits = produitRepository.findAll();
+        ExportUtil.ProduitExcelExportUtils excelExporter = new ExportUtil.ProduitExcelExportUtils(produits);
+        excelExporter.exportDataToExcel(response);
+    }
+    @GetMapping("Produits/export-pdf")
+    public void exportToPdf(HttpServletResponse response) throws IOException {
+        List<Produit> produits = produitRepository.findAll();
+        ExportUtil.ProduitPdfExportUtils pdfExporter = new ExportUtil.ProduitPdfExportUtils(produits);
+        try {
+            pdfExporter.exportDataToPdf(response);
+        } catch (DocumentException e) {
+            response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            response.getWriter().write("Erreur lors de la génération du PDF: " + e.getMessage());
+        }
+    }
+
 }

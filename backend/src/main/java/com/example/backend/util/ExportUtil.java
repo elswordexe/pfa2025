@@ -9,6 +9,19 @@ import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.FontFactory;
+import com.itextpdf.text.PageSize;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
+
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -200,6 +213,117 @@ public class ExportUtil {
                     writer.println(String.join(CSV_SEPARATOR, rowData));
                 }
             }
+        }
+    }
+    
+    public static class ProduitPdfExportUtils {
+        private final List<Produit> produitList;
+        
+        public ProduitPdfExportUtils(List<Produit> produitList) {
+            this.produitList = produitList;
+        }
+        
+        public void exportDataToPdf(HttpServletResponse response) throws IOException, DocumentException {
+            response.setContentType("application/pdf");
+            response.setHeader("Content-Disposition", "attachment; filename=produits_inventaire.pdf");
+            
+            Document document = new Document(PageSize.A4.rotate());
+            PdfWriter.getInstance(document, response.getOutputStream());
+            
+            document.open();
+            
+            // Ajouter le titre
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.BLACK);
+            Paragraph title = new Paragraph("Inventaire des Produits", titleFont);
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingAfter(20);
+            document.add(title);
+            
+            // Ajouter la date de génération
+            Font dateFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.DARK_GRAY);
+            Paragraph dateGeneration = new Paragraph("Généré le: " + 
+                LocalDateTime.now().format(DATE_FORMATTER), dateFont);
+            dateGeneration.setAlignment(Element.ALIGN_RIGHT);
+            dateGeneration.setSpacingAfter(20);
+            document.add(dateGeneration);
+            
+            // Créer le tableau
+            PdfPTable table = new PdfPTable(9); // 9 colonnes
+            table.setWidthPercentage(100);
+            
+            // Définir les largeurs relatives des colonnes
+            float[] columnWidths = {0.5f, 1.5f, 1.2f, 1.2f, 2.0f, 0.8f, 0.8f, 1.2f, 1.2f};
+            table.setWidths(columnWidths);
+            
+            // Définir l'en-tête du tableau
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.WHITE);
+            
+            String[] headers = {"ID", "Nom", "Code Barre", "Référence", "Description", 
+                "Prix", "Unité", "Catégorie", "Date"};
+            
+            for (String header : headers) {
+                PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
+                cell.setBackgroundColor(BaseColor.DARK_GRAY);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                cell.setPadding(5);
+                table.addCell(cell);
+            }
+            
+            // Ajouter les données
+            Font dataFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
+            boolean alternateColor = false;
+            
+            for (Produit produit : produitList) {
+                alternateColor = !alternateColor;
+                BaseColor backgroundColor = alternateColor ? 
+                    new BaseColor(240, 240, 240) : BaseColor.WHITE;
+                
+                addCell(table, produit.getId() != null ? produit.getId().toString() : "", 
+                        dataFont, backgroundColor);
+                addCell(table, produit.getNom(), dataFont, backgroundColor);
+                addCell(table, produit.getCodeBar(), dataFont, backgroundColor);
+                addCell(table, produit.getReference(), dataFont, backgroundColor);
+                
+                // Pour la description, on limite la longueur à 100 caractères
+                String description = produit.getDescription();
+                if (description != null && description.length() > 100) {
+                    description = description.substring(0, 97) + "...";
+                }
+                addCell(table, description, dataFont, backgroundColor);
+                
+                addCell(table, String.format("%.2f", produit.getPrix()), dataFont, backgroundColor);
+                addCell(table, produit.getUnite(), dataFont, backgroundColor);
+                
+                String category = "";
+                if (produit.getCategory() != null) {
+                    category = produit.getCategory().getName();
+                }
+                addCell(table, category, dataFont, backgroundColor);
+                
+                String date = "";
+                if (produit.getDatecremod() != null) {
+                    date = produit.getDatecremod().format(DATE_FORMATTER);
+                }
+                addCell(table, date, dataFont, backgroundColor);
+            }
+            
+            document.add(table);
+            
+            // Ajouter des informations de pied de page
+            Paragraph footer = new Paragraph("Nombre total de produits: " + produitList.size(), 
+                FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
+            footer.setSpacingBefore(20);
+            document.add(footer);
+            
+            document.close();
+        }
+        
+        private void addCell(PdfPTable table, String value, Font font, BaseColor backgroundColor) {
+            PdfPCell cell = new PdfPCell(new Phrase(value != null ? value : "", font));
+            cell.setBackgroundColor(backgroundColor);
+            cell.setPadding(5);
+            table.addCell(cell);
         }
     }
 }
