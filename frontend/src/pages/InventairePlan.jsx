@@ -20,7 +20,7 @@ import {
   Grid,
   Box // Add Box import
 } from '@mui/joy';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 import { SearchRounded as SearchIcon, CloseRounded } from '@mui/icons-material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';

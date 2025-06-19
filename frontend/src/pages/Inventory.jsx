@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 import axios from 'axios';
 import { useTheme, useMediaQuery } from '@mui/material';
 import { toast, ToastContainer } from 'react-toastify';

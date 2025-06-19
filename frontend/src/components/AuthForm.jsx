@@ -132,7 +132,7 @@ export const AuthForm = () => {
 
         switch (userRole) {
           case "SUPER_ADMIN":
-            window.location.href = "/dashboard";
+            window.location.href = "/dashsuperadmin";
             break;
           case "ADMIN_CLIENT":
             window.location.href = "/dashboard";

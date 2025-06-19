@@ -4,7 +4,7 @@ import {
   Modal, ModalDialog
 } from '@mui/joy';
 import { useState, useEffect } from 'react';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import axios from 'axios';
 

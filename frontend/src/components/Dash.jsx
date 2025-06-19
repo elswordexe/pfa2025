@@ -6,7 +6,7 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import Breadcrumbs from '@mui/joy/Breadcrumbs';
 import PlanStatusChart from './PlanStatusChart';
-import Sidebarsuper from './Sidebarsuper';
+import Sidebarsuper from './Sidebar';
 import DashboardCards from './DashboardCards';
 import LatestUpdates from './LatestUpdates';
 
@@ -30,7 +30,7 @@ export default function Dash() {
           overflowY: 'auto',
         }}
       >
-        {/* Breadcrumbs */}
+       
         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
           <Breadcrumbs
             size="sm"
@@ -47,7 +47,7 @@ export default function Dash() {
           </Breadcrumbs>
         </Box>
 
-        {/* Title Section */}
+      
         <Box
           sx={{
             display: 'flex',
@@ -67,7 +67,6 @@ export default function Dash() {
         {/* Cards */}
         <DashboardCards />
 
-        {/* Latest updates + Chart */}
         <Box
           sx={{
             display: 'flex',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 import {
   Typography,
   Button,

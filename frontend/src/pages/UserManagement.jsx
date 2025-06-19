@@ -8,7 +8,7 @@ import IconButton from '@mui/joy/IconButton';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 const roles = ["SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE", "Utilisateur"];
 
 export default function UserManagement() {

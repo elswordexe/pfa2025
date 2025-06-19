@@ -280,6 +280,15 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
         long count = utilisateurRepository.countByRole(Role.AGENT_INVENTAIRE);
         return ResponseEntity.ok((int) count);
     }
+    @Operation(summary="Compter le nombre d'administrateur Client")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Nombre d'administrateur Clients")
+    })
+    @GetMapping("users/countAdminClient")
+    public ResponseEntity<Integer> getCountAdminClient() {
+        long count = utilisateurRepository.countByRole(Role.ADMIN_CLIENT);
+        return ResponseEntity.ok((int) count);
+    }
     @Operation(summary = "déconnexion d'utilisateur")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "déconnexion réussie")

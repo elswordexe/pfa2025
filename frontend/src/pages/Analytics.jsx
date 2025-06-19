@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer 
 } from 'recharts';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 
 const Analytics = () => {
   const mockData = {
@@ -33,7 +33,7 @@ const Analytics = () => {
     },
     zoneStats: [
       { zoneId: 1, name: 'Zone A', accuracy: 95, totalProducts: 150 },
-      { zoneId: 2, name: 'Zone B', accuracy: 88, totalProducts: 120 },
+      { zoneId: 2, name: 'Zone B', accuracy: 89, totalProducts: 120 },
       { zoneId: 3, name: 'Zone C', accuracy: 92, totalProducts: 200 },
       { zoneId: 4, name: 'Zone D', accuracy: 85, totalProducts: 180 },
       { zoneId: 5, name: 'Zone E', accuracy: 90, totalProducts: 160 }

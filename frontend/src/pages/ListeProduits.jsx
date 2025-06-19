@@ -22,7 +22,7 @@ import {
   Input
 } from '@mui/joy';
 import { useState, useEffect } from 'react';
-import Sidebarsuper from '../components/Sidebarsuper';
+import Sidebarsuper from '../components/Sidebar';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import Warning from '@mui/icons-material/Warning';

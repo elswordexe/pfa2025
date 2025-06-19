@@ -12,11 +12,12 @@ import ListeProduits from './pages/ListeProduits';
 import Analytics from './pages/Analytics';
 import AuthForm from './components/AuthForm';
 import ZoneManagement from './pages/ZoneManagement';
-
+import Dashboardsuperadmin from './components/DashSuper';
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/dashsuperadmin" element={<Dashboardsuperadmin />} />
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dash />} />
         <Route path="/users" element={<UserManagement />} />
