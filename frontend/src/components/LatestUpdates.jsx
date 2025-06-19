@@ -7,16 +7,15 @@ function LatestList({ title, items }) {
   return (
     <Box
       sx={{
-        flex: '1 1 30%',
+        flex: '1 1 300px',
         bgcolor: 'white',
         borderRadius: 4,
-        border: '1px solid #f44336',
+        border: '1px solid #3675f4',
         boxShadow: '0 4px 20px rgba(244, 67, 54, 0.1)',
         p: 2.5,
         minWidth: 260,
         maxHeight: 400,
-        overflowY: 'hidden',
-        overflowX: 'hidden',
+        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -26,7 +25,7 @@ function LatestList({ title, items }) {
         sx={{
           mb: 2,
           fontWeight: 'bold',
-          color: '#f44336',
+          color: '#3675f4',
           textTransform: 'uppercase',
           letterSpacing: 1,
         }}
@@ -41,8 +40,6 @@ function LatestList({ title, items }) {
           m: 0,
           p: 0,
           flex: 1,
-          overflowY: 'hidden',
-          overflowX: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           gap: 1,
@@ -104,50 +101,46 @@ function LatestList({ title, items }) {
   );
 }
 
-
 export default function LatestUpdates() {
   const [userData, setUserData] = useState([]);
-  const [userData3, setUserData3] = useState([]);
-  const [userData2, setUserData2] = useState([]);
-useEffect(() => {
-  axios
-    .get('http://localhost:8080/users/names-dates')
-    .then((response) => {
-      const sorted = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setUserData(sorted);
-    })
-    .catch((error) => {
-      console.error('Erreur lors du chargement des utilisateurs:', error);
-    });
-}, []);
-useEffect(() => {
-  axios
-    .get('http://localhost:8080/Produits/names-dates')
-    .then((response) => {
-      const sorted = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-      setUserData2(sorted);
-    })
-    .catch((error) => {
-      console.error('Erreur lors du chargement des produits:', error);
-    });}, []);
-    useEffect(() => {
-      axios.get('http://localhost:8080/Plans/names-dates')
-        .then((response) => {
-          const sorted = response.data.sort((a, b) => new Date(b.date) - new Date(a.date));
-          setUserData3(sorted);
-        });},[]);
+  const [productData, setProductData] = useState([]);
+  const [planData, setPlanData] = useState([]);
+
+  useEffect(() => {
+    axios
+      .get('http://localhost:8080/users/names-dates')
+      .then((res) => setUserData(res.data.sort((a, b) => new Date(b.date) - new Date(a.date))))
+      .catch((err) => console.error('Erreur utilisateurs :', err));
+  }, []);
+
+  useEffect(() => {
+    axios
+      .get('http://localhost:8080/produits/names-dates')
+      .then((res) => setProductData(res.data.sort((a, b) => new Date(b.date) - new Date(a.date))))
+      .catch((err) => console.error('Erreur produits :', err));
+  }, []);
+
+  useEffect(() => {
+    axios
+      .get('http://localhost:8080/api/plans/names-dates')
+      .then((res) => setPlanData(res.data.sort((a, b) => new Date(b.date) - new Date(a.date))))
+      .catch((err) => console.error('Erreur plans :', err));
+  }, []);
+
   return (
     <Box
       sx={{
         display: 'flex',
-        gap: 2,
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
+        gap: 2,
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        width: '100%',
       }}
     >
       <LatestList title="Latest Users" items={userData} />
-      <LatestList title="Latest Products" items={userData2} />
-      <LatestList title="Latest Plans" items={userData3} />
+      <LatestList title="Latest Products" items={productData} />
+      <LatestList title="Latest Plans" items={planData} />
     </Box>
   );
 }

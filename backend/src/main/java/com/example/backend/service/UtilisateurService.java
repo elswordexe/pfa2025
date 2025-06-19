@@ -10,4 +10,7 @@ public interface UtilisateurService {
     Utilisateur createAgentInventaire(AgentInventaire agent, Long clientId);
     Utilisateur findByEmail(String email);
     boolean checkPassword(Utilisateur utilisateur, String password);
+    Utilisateur verifyEmail(String token);
+    void initiatePasswordReset(String email);
+    void resetPassword(String token, String newPassword);
 }

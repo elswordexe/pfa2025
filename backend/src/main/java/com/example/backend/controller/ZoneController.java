@@ -2,6 +2,7 @@ package com.example.backend.controller;
 
 import com.example.backend.model.Produit;
 import com.example.backend.model.Zone;
+import com.example.backend.model.ZoneProduitId;
 import com.example.backend.repository.ProduitRepository;
 import com.example.backend.repository.ZoneRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 import java.util.HashSet;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
+import com.example.backend.dto.ProduitDTO;
+import com.example.backend.dto.ZoneDTO;
+import com.example.backend.dto.ZoneProduitDTO;
+import com.example.backend.model.ZoneProduit;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -96,7 +102,6 @@ public class ZoneController {
     }
     @Operation(summary = "lister les produits d une zone spécifique ")
     @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "lister avec succe"),@ApiResponse(responseCode = "400", description = "erreur")}
-
     )
     @GetMapping("Zones/{zoneId}/products")
     public ResponseEntity<?> getZoneProducts(@PathVariable Long zoneId) {
@@ -105,8 +110,43 @@ public class ZoneController {
         if (zoneOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-
-        return ResponseEntity.ok(zoneOpt.get().getProduits());
+        
+        Zone zone = zoneOpt.get();
+        List<ProduitDTO> produitDTOs = zone.getProduits().stream()
+            .map(produit -> {
+                ProduitDTO dto = new ProduitDTO();
+                dto.setId(produit.getId());
+                dto.setCodeBarre(produit.getCodeBarre());
+                dto.setReference(produit.getReference());
+                dto.setNom(produit.getNom());
+                dto.setDescription(produit.getDescription());
+                dto.setPrix(produit.getPrix());
+                dto.setUnite(produit.getUnite());
+                dto.setDatecremod(produit.getDatecremod());
+                dto.setImageUrl(produit.getImageUrl());
+                dto.setQuantitetheo(produit.getQuantitetheo());
+                
+                // Map category
+                if (produit.getCategory() != null) {
+                    ProduitDTO.CategoryDTO categoryDTO = new ProduitDTO.CategoryDTO();
+                    categoryDTO.setId(produit.getCategory().getId());
+                    categoryDTO.setName(produit.getCategory().getName());
+                    dto.setCategory(categoryDTO);
+                }
+                
+                // Map subcategory
+                if (produit.getSubCategory() != null) {
+                    ProduitDTO.SubCategoryDTO subCategoryDTO = new ProduitDTO.SubCategoryDTO();
+                    subCategoryDTO.setId(produit.getSubCategory().getId());
+                    subCategoryDTO.setName(produit.getSubCategory().getName());
+                    dto.setSubCategory(subCategoryDTO);
+                }
+                
+                return dto;
+            })
+            .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(produitDTOs);
     }
     @Operation(summary = "supprimer un produit spécifique de le zone choisie")
     @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "suppression du produit avec succes"),@ApiResponse(responseCode = "400", description = "erreur")}
@@ -129,5 +169,60 @@ public class ZoneController {
     @GetMapping("Zone/count")
     public Long getZoneCount(){
         return zoneRepository.count();
+    }
+    @PutMapping("/Zone/update/{id}")
+    public ResponseEntity<?> updateZone(@PathVariable Long id, @RequestBody ZoneDTO zoneDTO) {
+        Optional<Zone> existingZoneOpt = zoneRepository.findById(id);
+        if (existingZoneOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Zone existingZone = existingZoneOpt.get();
+        existingZone.setName(zoneDTO.getName());
+        existingZone.setDescription(zoneDTO.getDescription());
+
+        // Clear existing products
+        existingZone.getZoneProduits().clear();
+
+        // Add new products with quantities
+        if (zoneDTO.getZoneProduits() != null) {
+            for (ZoneProduitDTO zpDTO : zoneDTO.getZoneProduits()) {
+                Optional<Produit> produitOpt = produitRepository.findById(zpDTO.getProduitId());
+                if (produitOpt.isPresent()) {
+                    ZoneProduit zoneProduit = new ZoneProduit();
+                    zoneProduit.setId(new ZoneProduitId(id, zpDTO.getProduitId()));
+                    zoneProduit.setZone(existingZone);
+                    zoneProduit.setProduit(produitOpt.get());
+                    zoneProduit.setQuantiteTheorique(zpDTO.getQuantitetheo());
+                    existingZone.getZoneProduits().add(zoneProduit);
+                }
+            }
+        }
+
+        Zone updatedZone = zoneRepository.save(existingZone);
+        return ResponseEntity.ok(updatedZone);
+    }
+
+    @PostMapping("Zone")
+    public ResponseEntity<?> createZone(@RequestBody ZoneDTO zoneDTO) {
+        Zone newZone = new Zone();
+        newZone.setName(zoneDTO.getName());
+        newZone.setDescription(zoneDTO.getDescription());
+
+        if (zoneDTO.getZoneProduits() != null) {
+            for (ZoneProduitDTO zpDTO : zoneDTO.getZoneProduits()) {
+                Optional<Produit> produitOpt = produitRepository.findById(zpDTO.getProduitId());
+                if (produitOpt.isPresent()) {
+                    ZoneProduit zoneProduit = new ZoneProduit();
+                    zoneProduit.setZone(newZone);
+                    zoneProduit.setProduit(produitOpt.get());
+                    zoneProduit.setQuantiteTheorique(zpDTO.getQuantitetheo());
+                    newZone.getZoneProduits().add(zoneProduit);
+                }
+            }
+        }
+
+        Zone savedZone = zoneRepository.save(newZone);
+        return ResponseEntity.ok(savedZone);
     }
 }

@@ -14,9 +14,6 @@ import java.util.List;
 @DiscriminatorValue("SUPER_ADMIN")
 public class SuperAdministrateur extends Utilisateur {
     
-    @OneToMany(mappedBy = "assignePar")
-    private List<AssignationAgent> assignationsCreees;
-    
     public SuperAdministrateur() {
         setRole(Role.SUPER_ADMIN);
     }

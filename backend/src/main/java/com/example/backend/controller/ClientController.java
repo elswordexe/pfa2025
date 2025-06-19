@@ -59,7 +59,6 @@ public class ClientController {
         return clientRepository.findById(id)
                 .map(client -> {
                     client.setNom(clientDetails.getNom());
-                    client.setAdresse(clientDetails.getAdresse());
                     client.setTelephone(clientDetails.getTelephone());
                     client.setEmail(clientDetails.getEmail());
                     Client updatedClient = clientRepository.save(client);

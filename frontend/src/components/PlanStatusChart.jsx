@@ -19,11 +19,9 @@ const PlanStatusChart = () => {
   const colors = ["#4caf50", "#2196f3", "#ff9800", "#f44336", "#9c27b0", "#00bcd4"];
 
   useEffect(() => {
-    axios.get("http://localhost:8080/Plans/countByStatus")
+    axios.get("http://localhost:8080/api/plans/countByStatus")
       .then((res) => {
         const data = res.data;
-        console.log("Données reçues :", data);
-
         const labels = Object.keys(data);
         const values = Object.values(data).map(Number);
         const allZero = values.every((v) => v === 0);
@@ -51,7 +49,6 @@ const PlanStatusChart = () => {
               ],
             };
 
-        console.log("Dataset généré :", dataset);
         setChartData(dataset);
       })
       .catch((err) => {
@@ -61,7 +58,6 @@ const PlanStatusChart = () => {
         setLoading(false);
       });
   }, []);
-
 
   const options = {
     responsive: true,
@@ -94,8 +90,9 @@ const PlanStatusChart = () => {
         boxShadow: "sm",
         bgcolor: "#FFFFFF",
         p: 2,
-        width: 280,
-        height: 320,
+        width: { xs: "100%", sm: 300, md: 320 },
+        maxWidth: '100%',
+        height: { xs: "auto", sm: 320 },
         display: "flex",
         flexDirection: "column",
         alignItems: "center",

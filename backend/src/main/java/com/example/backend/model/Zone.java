@@ -1,45 +1,42 @@
 package com.example.backend.model;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
-@Table(name = "zones")
-@AllArgsConstructor
 @Getter
 @Setter
-
+@NoArgsConstructor
 public class Zone {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private long id;
+    private Long id;
+
     private String name;
+    private String description;
 
-    @ManyToMany(fetch = FetchType.LAZY)
+    @ManyToMany
     @JoinTable(
-            name = "zone_produits",
-            joinColumns = @JoinColumn(name = "zone_id"),
-            inverseJoinColumns = @JoinColumn(name = "produit_id")
+        name = "zone_produit",
+        joinColumns = @JoinColumn(name = "zone_id"),
+        inverseJoinColumns = @JoinColumn(name = "produit_id")
     )
-    private List<Produit> produits=new ArrayList<>();
+    @JsonIgnoreProperties({"zones", "plans", "zoneProduits"})
+    private List<Produit> produits = new ArrayList<>();
 
-    public Zone() {
-    }
+    @ManyToMany(mappedBy = "zones")
+    @JsonIgnoreProperties({"zones", "produits", "assignations", "createur"})
+    private List<PlanInventaire> plans = new ArrayList<>();
 
-    public Zone(long id, String name) {
-        this.id = id;
-        this.name = name;
-    }
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties({"zone", "produit"})
+    private Set<ZoneProduit> zoneProduits = new HashSet<>();
 
-    public Zone(String name) {
-        this.name = name;
-    }
+    // methods omitted for brevity
 }

@@ -3,7 +3,6 @@ import axios from 'axios';
 import Button from '@mui/joy/Button';
 import Card from '@mui/joy/Card';
 import CardContent from '@mui/joy/CardContent';
-import CardActions from '@mui/joy/CardActions';
 import CircularProgress from '@mui/joy/CircularProgress';
 import Typography from '@mui/joy/Typography';
 import PersonIcon from '@mui/icons-material/Person';
@@ -11,6 +10,7 @@ import MapIcon from '@mui/icons-material/Map';
 import InventoryIcon from '@mui/icons-material/Inventory';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Box from '@mui/joy/Box';
+
 function DataCard({ title, icon: Icon, endpoint }) {
   const [count, setCount] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -26,24 +26,31 @@ function DataCard({ title, icon: Icon, endpoint }) {
 
   return (
     <Card
-  variant="solid"
-  color="danger"
-  invertedColors
-  sx={{
-    flex: '1 1 240px', // ← prend toute la ligne s'il n'y a pas la place
-    minWidth: 240,
-    maxWidth: '100%',
-    boxShadow: 'md',
-    borderRadius: 'lg',
-  }}
->
+      variant="solid"
+      color="primary"
+      invertedColors
+      sx={{
+        flex: '1 1 260px',
+        minWidth: { xs: '100%', sm: 240 },
+        maxWidth: '100%',
+        boxShadow: 'md',
+        borderRadius: 'lg',
+        bgcolor: 'blue.600',
+        '&:hover': {
+          bgcolor: 'blue.700',
+        }
+      }}
+    >
       <CardContent orientation="horizontal" sx={{ gap: 2 }}>
         <CircularProgress
           size="lg"
           determinate
           value={loading ? 100 : 100}
           thickness={8}
-          sx={{ '--CircularProgress-trackColor': 'rgba(255 255 255 / 0.4)' }}
+          sx={{ 
+            '--CircularProgress-trackColor': 'rgba(255 255 255 / 0.4)',
+            '--CircularProgress-progressColor': 'white'
+          }}
         >
           <Icon sx={{ fontSize: 40, color: 'white' }} />
         </CircularProgress>
@@ -62,14 +69,15 @@ function DataCard({ title, icon: Icon, endpoint }) {
 
 export default function DashboardCards() {
   return (
-   <Box
-  sx={{
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 2,
-    width: '100%',
-  }}
->
+    <Box
+      sx={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 2,
+        justifyContent: 'center',
+        width: '100%',
+      }}
+    >
       <DataCard 
         title="Inventory Agents" 
         icon={PersonIcon} 
@@ -83,12 +91,12 @@ export default function DashboardCards() {
       <DataCard 
         title="Products" 
         icon={InventoryIcon} 
-        endpoint="http://localhost:8080/Produits/count" 
+        endpoint="http://localhost:8080/produits/count" 
       />
       <DataCard 
         title="Completed Plans" 
         icon={CheckCircleIcon} 
-        endpoint="http://localhost:8080/Plans/countterminer" 
+        endpoint="http://localhost:8080/api/plans/countterminer" 
       />
     </Box>
   );

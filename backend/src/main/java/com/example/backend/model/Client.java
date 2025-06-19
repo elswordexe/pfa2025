@@ -2,21 +2,19 @@ package com.example.backend.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.List;
 
 @Entity
 @Data
-public class Client {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-    
-    private String nom;
-    private String adresse;
-    private String telephone;
-    private String email;
-    
+@EqualsAndHashCode(callSuper = true)
+@DiscriminatorValue("CLIENT")
+public class Client extends Utilisateur{
+    public Client() {
+        super();
+        setRole(Role.CLIENT);
+    }
     @OneToMany(mappedBy = "client")
     private List<AdministrateurClient> administrateurs;
     

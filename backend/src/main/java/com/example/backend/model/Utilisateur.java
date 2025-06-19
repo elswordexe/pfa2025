@@ -1,5 +1,6 @@
 package com.example.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import jakarta.persistence.*;
@@ -22,14 +23,15 @@ import java.util.List;
 @DiscriminatorValue("Utilisateur")
 @JsonTypeInfo(
         use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
         property = "dtype",
-        defaultImpl = Utilisateur.class
+        visible = true
 )
-
 @JsonSubTypes({
         @JsonSubTypes.Type(value = AdministrateurClient.class, name = "AdministrateurClient"),
-        @JsonSubTypes.Type(value = SuperAdministrateur.class, name = "SuperAdminisateur"),
-        @JsonSubTypes.Type(value = AgentInventaire.class, name = "AgentInventaire")
+        @JsonSubTypes.Type(value = SuperAdministrateur.class, name = "SuperAdministrateur"),
+        @JsonSubTypes.Type(value = AgentInventaire.class, name = "AgentInventaire"),
+        @JsonSubTypes.Type(value = Client.class, name = "Client")
 })
 
 public class Utilisateur implements UserDetails {
@@ -44,12 +46,20 @@ public class Utilisateur implements UserDetails {
     private String telephone;
     @Enumerated(EnumType.STRING)
     private Role role;
-    private LocalDateTime datecremod;
+    @Column(nullable = false)
+    private LocalDateTime datecremod = LocalDateTime.now();
     public Utilisateur() {
         this.role = Role.Utilisateur;
     }
-    
+
+    @Column
+    private String resetPasswordToken;
+
+    @Column
+    private LocalDateTime resetPasswordTokenExpiryDate;
+
     @Override
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (role == null) {
             return List.of(new SimpleGrantedAuthority("ROLE_" + Role.Utilisateur.name()));
@@ -72,9 +82,12 @@ public class Utilisateur implements UserDetails {
         return true;
     }
 
-    @Override
-    public boolean isEnabled() {
-        return true;
+    public LocalDateTime getDatecremod() {
+        return datecremod;
+    }
+
+    public void setDatecremod(LocalDateTime datecremod) {
+        this.datecremod = datecremod;
     }
 
     public Role getRole() {
@@ -95,4 +108,25 @@ public class Utilisateur implements UserDetails {
         this.password = password;
         this.role = Role.Utilisateur;
     }
+
+    public String getResetPasswordToken() {
+        return resetPasswordToken;
+    }
+
+    public void setResetPasswordToken(String resetPasswordToken) {
+        this.resetPasswordToken = resetPasswordToken;
+    }
+
+    public LocalDateTime getResetPasswordTokenExpiryDate() {
+        return resetPasswordTokenExpiryDate;
+    }
+
+    public void setResetPasswordTokenExpiryDate(LocalDateTime resetPasswordTokenExpiryDate) {
+        this.resetPasswordTokenExpiryDate = resetPasswordTokenExpiryDate;
+    }
+
+    public LocalDateTime getDateCreation() {
+        return datecremod;
+    }
+
 }

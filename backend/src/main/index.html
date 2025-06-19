@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Testeur d'API - Système d'Inventaire</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        
+        .endpoint-group {
+            margin-bottom: 30px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f8f9fa;
+        }
+        
+        .endpoint {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+        
+        .endpoint h4 {
+            margin: 0 0 10px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            color: white;
+            margin-right: 10px;
+            font-size: 0.8em;
+            min-width: 60px;
+            text-align: center;
+        }
+        
+        .get { background-color: #61affe; }
+        .post { background-color: #49cc90; }
+        .put { background-color: #fca130; }
+        .delete { background-color: #f93e3e; }
+        
+        .form-group {
+            margin-bottom: 10px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        input, textarea, button {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        
+        input, textarea {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        textarea {
+            height: 100px;
+            font-family: monospace;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .response {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            display: none;
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            background-color: #eee;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        
+        .tab.active {
+            background-color: #fff;
+            border-bottom-color: #fff;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Testeur d'API - Système d'Inventaire</h1>
+    <p>Utilisez ce testeur pour vérifier le bon fonctionnement des endpoints de l'API.</p>
+    
+    <div class="tabs">
+        <div class="tab active" data-tab="users">Utilisateurs</div>
+        <div class="tab" data-tab="plans">Plans d'inventaire</div>
+        <div class="tab" data-tab="zones">Zones</div>
+    </div>
+    
+    <!-- TAB: UTILISATEURS -->
+    <div id="users" class="tab-content active">
+        <div class="endpoint-group">
+            <h2>Gestion des Utilisateurs</h2>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /users</h4>
+                <p>Liste tous les utilisateurs</p>
+                <button onclick="sendRequest('GET', '/users', null, 'users-list-response')">Exécuter</button>
+                <div id="users-list-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /users/register</h4>
+                <p>Enregistre un nouvel utilisateur</p>
+                <div class="form-group">
+                    <label for="register-body">Corps de la requête:</label>
+                    <textarea id="register-body">{
+  "nom": "Dupont",
+  "prenom": "Jean",
+  "email": "jean.dupont@example.com",
+  "password": "motdepasse123",
+  "telephone": "0612345678",
+  "role": "ADMIN_CLIENT"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/users/register', document.getElementById('register-body').value, 'register-response')">Exécuter</button>
+                <div id="register-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /users/client-admin/{clientId}</h4>
+                <p>Crée un compte administrateur client</p>
+                <div class="form-group">
+                    <label for="client-id">ID Client:</label>
+                    <input type="number" id="client-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="admin-body">Corps de la requête:</label>
+                    <textarea id="admin-body">{
+  "nom": "Admin",
+  "prenom": "Client",
+  "email": "admin.client@example.com",
+  "password": "admin123",
+  "telephone": "0698765432"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/users/client-admin/' + document.getElementById('client-id').value, document.getElementById('admin-body').value, 'admin-response')">Exécuter</button>
+                <div id="admin-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /users/agent-inventaire/{clientId}</h4>
+                <p>Crée un compte agent d'inventaire</p>
+                <div class="form-group">
+                    <label for="agent-client-id">ID Client:</label>
+                    <input type="number" id="agent-client-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="agent-body">Corps de la requête:</label>
+                    <textarea id="agent-body">{
+  "nom": "Agent",
+  "prenom": "Inventaire",
+  "email": "agent.inventaire@example.com",
+  "password": "agent123",
+  "telephone": "0656789012"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/users/agent-inventaire/' + document.getElementById('agent-client-id').value, document.getElementById('agent-body').value, 'agent-response')">Exécuter</button>
+                <div id="agent-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /users/login</h4>
+                <p>Authentification d'un utilisateur</p>
+                <div class="form-group">
+                    <label for="login-body">Corps de la requête:</label>
+                    <textarea id="login-body">{
+  "email": "jean.dupont@example.com",
+  "password": "motdepasse123"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/users/login', document.getElementById('login-body').value, 'login-response')">Exécuter</button>
+                <div id="login-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /users/logout</h4>
+                <p>Déconnexion d'un utilisateur</p>
+                <button onclick="sendRequest('POST', '/users/logout', null, 'logout-response')">Exécuter</button>
+                <div id="logout-response" class="response"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- TAB: PLANS D'INVENTAIRE -->
+    <div id="plans" class="tab-content">
+        <div class="endpoint-group">
+            <h2>Gestion des Plans d'Inventaire</h2>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /Plans</h4>
+                <p>Liste tous les plans d'inventaire</p>
+                <button onclick="sendRequest('GET', '/Plans', null, 'plans-list-response')">Exécuter</button>
+                <div id="plans-list-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /Plan/{planId}</h4>
+                <p>Récupère un plan par son ID</p>
+                <div class="form-group">
+                    <label for="plan-id">ID Plan:</label>
+                    <input type="number" id="plan-id" value="1">
+                </div>
+                <button onclick="sendRequest('GET', '/Plan/' + document.getElementById('plan-id').value, null, 'plan-get-response')">Exécuter</button>
+                <div id="plan-get-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /Plan/ajout</h4>
+                <p>Ajoute un nouveau plan d'inventaire</p>
+                <div class="form-group">
+                    <label for="plan-add-body">Corps de la requête:</label>
+                    <textarea id="plan-add-body">{
+  "nom": "Plan Inventaire Annuel",
+  "description": "Inventaire des produits en fin d'année",
+  "dateDebut": "2025-01-01T00:00:00",
+  "dateFin": "2025-01-15T00:00:00",
+  "zones": []
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/Plan/ajout', document.getElementById('plan-add-body').value, 'plan-add-response')">Exécuter</button>
+                <div id="plan-add-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method put">PUT</span> /Plan/{planId}</h4>
+                <p>Modifie un plan d'inventaire</p>
+                <div class="form-group">
+                    <label for="plan-update-id">ID Plan:</label>
+                    <input type="number" id="plan-update-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="plan-update-body">Corps de la requête:</label>
+                    <textarea id="plan-update-body">{
+  "id": 1,
+  "nom": "Plan Inventaire Modifié",
+  "description": "Description mise à jour",
+  "dateDebut": "2025-02-01T00:00:00",
+  "dateFin": "2025-02-15T00:00:00",
+  "zones": []
+}</textarea>
+                </div>
+                <button onclick="sendRequest('PUT', '/Plan/' + document.getElementById('plan-update-id').value, document.getElementById('plan-update-body').value, 'plan-update-response')">Exécuter</button>
+                <div id="plan-update-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method delete">DELETE</span> /Plan/{planId}</h4>
+                <p>Supprime un plan d'inventaire</p>
+                <div class="form-group">
+                    <label for="plan-delete-id">ID Plan:</label>
+                    <input type="number" id="plan-delete-id" value="1">
+                </div>
+                <button onclick="sendRequest('DELETE', '/Plan/' + document.getElementById('plan-delete-id').value, null, 'plan-delete-response')">Exécuter</button>
+                <div id="plan-delete-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /plans/{planId}/zones</h4>
+                <p>Liste les zones d'un plan</p>
+                <div class="form-group">
+                    <label for="plan-zones-id">ID Plan:</label>
+                    <input type="number" id="plan-zones-id" value="1">
+                </div>
+                <button onclick="sendRequest('GET', '/plans/' + document.getElementById('plan-zones-id').value + '/zones', null, 'plan-zones-response')">Exécuter</button>
+                <div id="plan-zones-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /plans/{planId}/zones</h4>
+                <p>Ajoute des zones à un plan</p>
+                <div class="form-group">
+                    <label for="plan-add-zones-id">ID Plan:</label>
+                    <input type="number" id="plan-add-zones-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="plan-add-zones-body">Corps de la requête:</label>
+                    <textarea id="plan-add-zones-body">[
+  {
+    "nom": "Zone A",
+    "description": "Zone de stockage A"
+  },
+  {
+    "nom": "Zone B",
+    "description": "Zone de stockage B"
+  }
+]</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/plans/' + document.getElementById('plan-add-zones-id').value + '/zones', document.getElementById('plan-add-zones-body').value, 'plan-add-zones-response')">Exécuter</button>
+                <div id="plan-add-zones-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /plans/{planId}/agents/{agentId}/assignations</h4>
+                <p>Assigne un agent à une zone</p>
+                <div class="form-group">
+                    <label for="assign-plan-id">ID Plan:</label>
+                    <input type="number" id="assign-plan-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="assign-agent-id">ID Agent:</label>
+                    <input type="number" id="assign-agent-id" value="2">
+                </div>
+                <div class="form-group">
+                    <label for="assign-zone-body">Corps de la requête (Zone):</label>
+                    <textarea id="assign-zone-body">{
+  "id": 1,
+  "nom": "Zone A",
+  "description": "Zone de stockage A"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/plans/' + document.getElementById('assign-plan-id').value + '/agents/' + document.getElementById('assign-agent-id').value + '/assignations', document.getElementById('assign-zone-body').value, 'assign-response')">Exécuter</button>
+                <div id="assign-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /plans/{planId}/assignations</h4>
+                <p>Liste les assignations d'un plan</p>
+                <div class="form-group">
+                    <label for="plan-assignations-id">ID Plan:</label>
+                    <input type="number" id="plan-assignations-id" value="1">
+                </div>
+                <button onclick="sendRequest('GET', '/plans/' + document.getElementById('plan-assignations-id').value + '/assignations', null, 'plan-assignations-response')">Exécuter</button>
+                <div id="plan-assignations-response" class="response"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- TAB: ZONES -->
+    <div id="zones" class="tab-content">
+        <div class="endpoint-group">
+            <h2>Gestion des Zones</h2>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /Zones</h4>
+                <p>Liste toutes les zones</p>
+                <button onclick="sendRequest('GET', '/Zones', null, 'zones-list-response')">Exécuter</button>
+                <div id="zones-list-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /Zones</h4>
+                <p>Crée une nouvelle zone</p>
+                <div class="form-group">
+                    <label for="zone-add-body">Corps de la requête:</label>
+                    <textarea id="zone-add-body">{
+  "nom": "Nouvelle Zone",
+  "description": "Description de la zone"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/Zones', document.getElementById('zone-add-body').value, 'zone-add-response')">Exécuter</button>
+                <div id="zone-add-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method put">PUT</span> /Zones/{zoneId}</h4>
+                <p>Modifie une zone</p>
+                <div class="form-group">
+                    <label for="zone-update-id">ID Zone:</label>
+                    <input type="number" id="zone-update-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="zone-update-body">Corps de la requête:</label>
+                    <textarea id="zone-update-body">{
+  "id": 1,
+  "nom": "Zone Modifiée",
+  "description": "Description mise à jour"
+}</textarea>
+                </div>
+                <button onclick="sendRequest('PUT', '/Zones/' + document.getElementById('zone-update-id').value, document.getElementById('zone-update-body').value, 'zone-update-response')">Exécuter</button>
+                <div id="zone-update-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method delete">DELETE</span> /Zones/{zoneId}</h4>
+                <p>Supprime une zone</p>
+                <div class="form-group">
+                    <label for="zone-delete-id">ID Zone:</label>
+                    <input type="number" id="zone-delete-id" value="1">
+                </div>
+                <button onclick="sendRequest('DELETE', '/Zones/' + document.getElementById('zone-delete-id').value, null, 'zone-delete-response')">Exécuter</button>
+                <div id="zone-delete-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method post">POST</span> /Zones/{zoneId}</h4>
+                <p>Ajoute des produits à une zone</p>
+                <div class="form-group">
+                    <label for="zone-add-products-id">ID Zone:</label>
+                    <input type="number" id="zone-add-products-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="zone-add-products-body">Corps de la requête (IDs des produits):</label>
+                    <textarea id="zone-add-products-body">[1, 2, 3]</textarea>
+                </div>
+                <button onclick="sendRequest('POST', '/Zones/' + document.getElementById('zone-add-products-id').value, document.getElementById('zone-add-products-body').value, 'zone-add-products-response')">Exécuter</button>
+                <div id="zone-add-products-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method get">GET</span> /Zones/{zoneId}/products</h4>
+                <p>Liste les produits d'une zone</p>
+                <div class="form-group">
+                    <label for="zone-products-id">ID Zone:</label>
+                    <input type="number" id="zone-products-id" value="1">
+                </div>
+                <button onclick="sendRequest('GET', '/Zones/' + document.getElementById('zone-products-id').value + '/products', null, 'zone-products-response')">Exécuter</button>
+                <div id="zone-products-response" class="response"></div>
+            </div>
+            
+            <div class="endpoint">
+                <h4><span class="method delete">DELETE</span> /Zones/{zoneId}/products/{productId}</h4>
+                <p>Retire un produit d'une zone</p>
+                <div class="form-group">
+                    <label for="zone-remove-product-zone-id">ID Zone:</label>
+                    <input type="number" id="zone-remove-product-zone-id" value="1">
+                </div>
+                <div class="form-group">
+                    <label for="zone-remove-product-id">ID Produit:</label>
+                    <input type="number" id="zone-remove-product-id" value="1">
+                </div>
+                <button onclick="sendRequest('DELETE', '/Zones/' + document.getElementById('zone-remove-product-zone-id').value + '/products/' + document.getElementById('zone-remove-product-id').value, null, 'zone-remove-product-response')">Exécuter</button>
+                <div id="zone-remove-product-response" class="response"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        const API_BASE_URL = '';  // Laisser vide si on exécute sur le même domaine, sinon mettre l'URL de l'API
+        let token = null;  // Pour stocker le token d'authentification
+        
+        // Gestion des onglets
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Désactiver tous les onglets
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                // Activer l'onglet cliqué
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+        
+        // Fonction pour envoyer les requêtes
+        async function sendRequest(method, endpoint, body, responseElementId) {
+            const responseElement = document.getElementById(responseElementId);
+            responseElement.style.display = 'block';
+            responseElement.textContent = 'Envoi de la requête...';
+            
+            try {
+                const url = API_BASE_URL + endpoint;
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                // Ajouter le token d'authentification s'il existe
+                if (token) {
+                    headers['Authorization'] = `Bearer ${token}`;
+                }
+                
+                const options = {
+                    method: method,
+                    headers: headers
+                };
+                
+                // Ajouter le corps de la requête si nécessaire
+                if (body && (method === 'POST' || method === 'PUT')) {
+                    options.body = body;
+                }
+                
+                const response = await fetch(url, options);
+                
+                // Sauvegarder le token s'il s'agit d'une réponse de login
+                if (endpoint === '/users/login' && response.ok) {
+                    const data = await response.json();
+                    if (data.token) {
+                        token = data.token;
+                        responseElement.textContent = JSON.stringify(data, null, 2) + '\n\nToken sauvegardé pour les prochaines requêtes.';
+                        return;
+                    }
+                }
+                
+                // Afficher le résultat
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const data = await response.json();
+                    responseElement.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    const text = await response.text();
+                    responseElement.textContent = text || `Statut: ${response.status} ${response.statusText}`;
+                }
+            } catch (error) {
+                responseElement.textContent = `Erreur: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

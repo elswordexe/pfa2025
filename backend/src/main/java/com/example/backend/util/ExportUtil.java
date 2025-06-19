@@ -1,329 +1,229 @@
 package com.example.backend.util;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.HorizontalAlignment;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.xssf.usermodel.XSSFFont;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-
-import com.itextpdf.text.BaseColor;
-import com.itextpdf.text.Document;
-import com.itextpdf.text.DocumentException;
-import com.itextpdf.text.Element;
+import com.example.backend.model.Ecart;
+import com.example.backend.model.PlanInventaire;
+import com.itextpdf.text.*;
 import com.itextpdf.text.Font;
-import com.itextpdf.text.FontFactory;
-import com.itextpdf.text.PageSize;
-import com.itextpdf.text.Paragraph;
-import com.itextpdf.text.Phrase;
-import com.itextpdf.text.pdf.PdfPCell;
-import com.itextpdf.text.pdf.PdfPTable;
-import com.itextpdf.text.pdf.PdfWriter;
-
-import jakarta.servlet.ServletOutputStream;
+import com.itextpdf.text.pdf.*;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.*;
 import jakarta.servlet.http.HttpServletResponse;
-
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.io.IOException;
 import java.util.List;
-
-import com.example.backend.model.Produit;
 
 public class ExportUtil {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    
-    public static class ProduitExcelExportUtils {
-        private final XSSFWorkbook workbook;
-        private XSSFSheet sheet;
-        private final List<Produit> produitList;
 
-        public ProduitExcelExportUtils(List<Produit> produitList) {
-            this.produitList = produitList;
-            this.workbook = new XSSFWorkbook();
-        }
+    public static class EcartPdfExportUtils {
+        private final List<Ecart> ecarts;
+        private final PlanInventaire plan;
 
-        private void createCell(Row row, int columnCount, Object value, CellStyle style) {
-            sheet.autoSizeColumn(columnCount);
-            Cell cell = row.createCell(columnCount);
-            
-            if (value == null) {
-                cell.setCellValue("");
-            } else if (value instanceof Integer) {
-                cell.setCellValue((Integer) value);
-            } else if (value instanceof Double) {
-                cell.setCellValue((Double) value);
-            } else if (value instanceof Boolean) {
-                cell.setCellValue((Boolean) value);
-            } else if (value instanceof Long) {
-                cell.setCellValue((Long) value);
-            } else if (value instanceof LocalDateTime) {
-                LocalDateTime dateTime = (LocalDateTime) value;
-                cell.setCellValue(dateTime.format(DATE_FORMATTER));
-            } else {
-                cell.setCellValue(value.toString());
-            }
-            
-            cell.setCellStyle(style);
+        public EcartPdfExportUtils(List<Ecart> ecarts, PlanInventaire plan) {
+            this.ecarts = ecarts;
+            this.plan = plan;
         }
 
-        private void createHeaderRow() {
-            sheet = workbook.createSheet("Informations Produits");
-            Row row = sheet.createRow(0);
-            CellStyle style = workbook.createCellStyle();
-            XSSFFont font = workbook.createFont();
-            font.setBold(true);
-            font.setFontHeight(20);
-            style.setFont(font);
-            style.setAlignment(HorizontalAlignment.CENTER);
-            createCell(row, 0, "Inventaire des Produits", style);
-            sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 8)); // 9 colonnes (0-8)
-
-            row = sheet.createRow(1);
-            font = workbook.createFont(); // Nouvel objet font
-            font.setBold(true);
-            font.setFontHeight(16);
-            
-            CellStyle headerStyle = workbook.createCellStyle(); // Nouveau style
-            headerStyle.setFont(font);
-            
-            createCell(row, 0, "ID", headerStyle);
-            createCell(row, 1, "Nom", headerStyle);
-            createCell(row, 2, "Code Barre", headerStyle);
-            createCell(row, 3, "Référence", headerStyle);
-            createCell(row, 4, "Description", headerStyle);
-            createCell(row, 5, "Prix", headerStyle);
-            createCell(row, 6, "Unité", headerStyle);
-            createCell(row, 7, "Catégorie", headerStyle);
-            createCell(row, 8, "Date", headerStyle);
-        }
-
-        private void writeProduitData() {
-            int rowCount = 2;
-            CellStyle style = workbook.createCellStyle();
-            XSSFFont font = workbook.createFont();
-            font.setFontHeight(14);
-            style.setFont(font);
-
-            for (Produit produit : produitList) {
-                Row row = sheet.createRow(rowCount++);
-                int columnCount = 0;
-                createCell(row, columnCount++, produit.getId(), style);
-                createCell(row, columnCount++, produit.getNom(), style);
-                createCell(row, columnCount++, produit.getCodeBar(), style);
-                createCell(row, columnCount++, produit.getReference(), style);
-                createCell(row, columnCount++, produit.getDescription(), style);
-                createCell(row, columnCount++, produit.getPrix(), style);
-                createCell(row, columnCount++, produit.getUnite(), style);
-                
-                // Vérifier si la catégorie existe
-                if (produit.getCategory() != null) {
-                    createCell(row, columnCount++, produit.getCategory().getName(), style);
-                } else {
-                    createCell(row, columnCount++, "", style);
-                }
-                
-                createCell(row, columnCount++, produit.getDatecremod(), style);
-            }
-        }
-
-        public void exportDataToExcel(HttpServletResponse response) throws IOException {
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            response.setHeader("Content-Disposition", "attachment; filename=produits_inventaire.xlsx");
-            
-            createHeaderRow();
-            writeProduitData();
-            
-            try (ServletOutputStream outputStream = response.getOutputStream()) {
-                workbook.write(outputStream);
-                workbook.close();
-            }
-        }
-    }
-    
-    public static class ProduitCsvExportUtils {
-        private final List<Produit> produitList;
-        private static final String CSV_SEPARATOR = ";";
-        
-        public ProduitCsvExportUtils(List<Produit> produitList) {
-            this.produitList = produitList;
-        }
-        
-        private String escapeSpecialCharacters(String data) {
-            if (data == null) {
-                return "";
-            }
-            String escapedData = data.replaceAll("\\R", " ");
-            if (data.contains(CSV_SEPARATOR) || data.contains("\"") || data.contains("'")) {
-                data = data.replace("\"", "\"\"");
-                escapedData = "\"" + data + "\"";
-            }
-            return escapedData;
-        }
-        
-        private String[] getHeaders() {
-            return new String[] {
-                "ID", "Nom", "Code Barre", "Référence", "Description", "Prix", 
-                "Unité", "Catégorie", "Date"
-            };
-        }
-        
-        private String[] getRowData(Produit produit) {
-            String categoryName = "";
-            if (produit.getCategory() != null) {
-                categoryName = produit.getCategory().getName();
-            }
-            
-            String dateStr = "";
-            if (produit.getDatecremod() != null) {
-                dateStr = produit.getDatecremod().format(DATE_FORMATTER);
-            }
-            
-            return new String[] {
-                produit.getId() != null ? produit.getId().toString() : "",
-                escapeSpecialCharacters(produit.getNom()),
-                escapeSpecialCharacters(produit.getCodeBar()),
-                escapeSpecialCharacters(produit.getReference()),
-                escapeSpecialCharacters(produit.getDescription()),
-                String.valueOf(produit.getPrix()),
-                escapeSpecialCharacters(produit.getUnite()),
-                escapeSpecialCharacters(categoryName),
-                dateStr
-            };
-        }
-        
-        public void exportDataToCsv(HttpServletResponse response) throws IOException {
-            response.setContentType("text/csv");
-            response.setCharacterEncoding("UTF-8");
-            response.setHeader("Content-Disposition", "attachment; filename=produits_inventaire.csv");
-            
-            try (PrintWriter writer = response.getWriter()) {
-                // Écrire l'en-tête BOM UTF-8 pour une compatibilité Excel optimale
-                writer.write('\ufeff');
-                
-                // Écrire l'en-tête
-                writer.println(String.join(CSV_SEPARATOR, getHeaders()));
-                
-                // Écrire les données
-                for (Produit produit : produitList) {
-                    String[] rowData = getRowData(produit);
-                    writer.println(String.join(CSV_SEPARATOR, rowData));
-                }
-            }
-        }
-    }
-    
-    public static class ProduitPdfExportUtils {
-        private final List<Produit> produitList;
-        
-        public ProduitPdfExportUtils(List<Produit> produitList) {
-            this.produitList = produitList;
-        }
-        
-        public void exportDataToPdf(HttpServletResponse response) throws IOException, DocumentException {
-            response.setContentType("application/pdf");
-            response.setHeader("Content-Disposition", "attachment; filename=produits_inventaire.pdf");
-            
+        public void exportDataToPdf(HttpServletResponse response) throws DocumentException, IOException {
             Document document = new Document(PageSize.A4.rotate());
             PdfWriter.getInstance(document, response.getOutputStream());
-            
+
             document.open();
-            
-            // Ajouter le titre
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.BLACK);
-            Paragraph title = new Paragraph("Inventaire des Produits", titleFont);
+            addDocumentHeader(document);
+            addPlanInfo(document);
+            addDataTable(document);
+            addSummary(document);
+            document.close();
+        }
+
+        private void addDocumentHeader(Document document) throws DocumentException {
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16, BaseColor.DARK_GRAY);
+            Paragraph title = new Paragraph("Rapport des Écarts d'Inventaire", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             title.setSpacingAfter(20);
             document.add(title);
-            
-            // Ajouter la date de génération
-            Font dateFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.DARK_GRAY);
-            Paragraph dateGeneration = new Paragraph("Généré le: " + 
-                LocalDateTime.now().format(DATE_FORMATTER), dateFont);
-            dateGeneration.setAlignment(Element.ALIGN_RIGHT);
-            dateGeneration.setSpacingAfter(20);
-            document.add(dateGeneration);
-            
-            // Créer le tableau
-            PdfPTable table = new PdfPTable(9); // 9 colonnes
+        }
+
+        private void addPlanInfo(Document document) throws DocumentException {
+            Font infoFont = FontFactory.getFont(FontFactory.HELVETICA, 12, BaseColor.DARK_GRAY);
+            Paragraph planInfo = new Paragraph();
+            planInfo.add(new Chunk("Plan: " + plan.getNom() + "\n", FontFactory.getFont(FontFactory.HELVETICA_BOLD)));
+            planInfo.add("Date de début: " + plan.getDateDebut().format(DATE_FORMATTER) + "\n");
+            planInfo.add("Date de fin: " + plan.getDateFin().format(DATE_FORMATTER) + "\n");
+            planInfo.setSpacingAfter(20);
+            document.add(planInfo);
+        }
+
+        private void addDataTable(Document document) throws DocumentException {
+            PdfPTable table = createTable();
+            addTableHeaders(table);
+            addTableData(table);
+            document.add(table);
+        }
+
+        private PdfPTable createTable() throws DocumentException {
+            PdfPTable table = new PdfPTable(8);
             table.setWidthPercentage(100);
-            
-            // Définir les largeurs relatives des colonnes
-            float[] columnWidths = {0.5f, 1.5f, 1.2f, 1.2f, 2.0f, 0.8f, 0.8f, 1.2f, 1.2f};
+            table.setSpacingBefore(10f);
+            table.setSpacingAfter(10f);
+            float[] columnWidths = {3f, 2f, 2f, 1.5f, 1.5f, 1.5f, 2.5f, 2f};
             table.setWidths(columnWidths);
-            
-            // Définir l'en-tête du tableau
-            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12, BaseColor.WHITE);
-            
-            String[] headers = {"ID", "Nom", "Code Barre", "Référence", "Description", 
-                "Prix", "Unité", "Catégorie", "Date"};
-            
+            return table;
+        }
+
+        private void addTableHeaders(PdfPTable table) {
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, BaseColor.WHITE);
+            BaseColor headerBg = new BaseColor(63, 81, 181);
+
+            String[] headers = {"Produit", "Code Barre", "Zone", "Théorique", "Compté", "Écart", "Date Validation", "Statut"};
             for (String header : headers) {
                 PdfPCell cell = new PdfPCell(new Phrase(header, headerFont));
-                cell.setBackgroundColor(BaseColor.DARK_GRAY);
-                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+                cell.setBackgroundColor(headerBg);
                 cell.setPadding(5);
+                cell.setHorizontalAlignment(Element.ALIGN_CENTER);
                 table.addCell(cell);
             }
-            
-            // Ajouter les données
-            Font dataFont = FontFactory.getFont(FontFactory.HELVETICA, 10, BaseColor.BLACK);
-            boolean alternateColor = false;
-            
-            for (Produit produit : produitList) {
-                alternateColor = !alternateColor;
-                BaseColor backgroundColor = alternateColor ? 
-                    new BaseColor(240, 240, 240) : BaseColor.WHITE;
-                
-                addCell(table, produit.getId() != null ? produit.getId().toString() : "", 
-                        dataFont, backgroundColor);
-                addCell(table, produit.getNom(), dataFont, backgroundColor);
-                addCell(table, produit.getCodeBar(), dataFont, backgroundColor);
-                addCell(table, produit.getReference(), dataFont, backgroundColor);
-                
-                // Pour la description, on limite la longueur à 100 caractères
-                String description = produit.getDescription();
-                if (description != null && description.length() > 100) {
-                    description = description.substring(0, 97) + "...";
-                }
-                addCell(table, description, dataFont, backgroundColor);
-                
-                addCell(table, String.format("%.2f", produit.getPrix()), dataFont, backgroundColor);
-                addCell(table, produit.getUnite(), dataFont, backgroundColor);
-                
-                String category = "";
-                if (produit.getCategory() != null) {
-                    category = produit.getCategory().getName();
-                }
-                addCell(table, category, dataFont, backgroundColor);
-                
-                String date = "";
-                if (produit.getDatecremod() != null) {
-                    date = produit.getDatecremod().format(DATE_FORMATTER);
-                }
-                addCell(table, date, dataFont, backgroundColor);
-            }
-            
-            document.add(table);
-            
-            // Ajouter des informations de pied de page
-            Paragraph footer = new Paragraph("Nombre total de produits: " + produitList.size(), 
-                FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12));
-            footer.setSpacingBefore(20);
-            document.add(footer);
-            
-            document.close();
         }
-        
-        private void addCell(PdfPTable table, String value, Font font, BaseColor backgroundColor) {
-            PdfPCell cell = new PdfPCell(new Phrase(value != null ? value : "", font));
+
+        private void addTableData(PdfPTable table) {
+            Font dataFont = FontFactory.getFont(FontFactory.HELVETICA, 9);
+            BaseColor altRowColor = new BaseColor(240, 244, 255);
+
+            for (int i = 0; i < ecarts.size(); i++) {
+                Ecart ecart = ecarts.get(i);
+                BaseColor rowColor = (i % 2 == 0) ? BaseColor.WHITE : altRowColor;
+                
+                addCell(table, ecart.getProduit().getNom(), rowColor, dataFont);
+                addCell(table, ecart.getProduit().getCodeBarre(), rowColor, dataFont);
+                addCell(table, ecart.getProduit().getZones().stream()
+                        .map(z -> z.getName())
+                        .findFirst()
+                        .orElse("-"), rowColor, dataFont);
+                addCell(table, String.valueOf(ecart.getQuantiteTheorique()), rowColor, dataFont);
+                addCell(table, String.valueOf(ecart.getQuantiteComptee()), rowColor, dataFont);
+                addCell(table, String.valueOf(ecart.getQuantiteComptee() - ecart.getQuantiteTheorique()), rowColor, dataFont);
+                addCell(table, ecart.getDateValidation() != null ?
+                        ecart.getDateValidation().format(DATE_FORMATTER) : "-", rowColor, dataFont);
+                addCell(table, ecart.getStatut().toString(), rowColor, dataFont);
+            }
+        }
+
+        private void addSummary(Document document) throws DocumentException {
+            Paragraph summary = new Paragraph();
+            summary.add(new Chunk("\nTotal des écarts: " + ecarts.size(), FontFactory.getFont(FontFactory.HELVETICA_BOLD)));
+            summary.setSpacingBefore(20);
+            document.add(summary);
+        }
+
+        private void addCell(PdfPTable table, String text, BaseColor backgroundColor, com.itextpdf.text.Font font) {
+            PdfPCell cell = new PdfPCell(new Phrase(text, font));
             cell.setBackgroundColor(backgroundColor);
             cell.setPadding(5);
+            cell.setHorizontalAlignment(Element.ALIGN_LEFT);
             table.addCell(cell);
+        }
+    }
+
+    public static class EcartExcelExportUtils {
+        private final List<Ecart> ecarts;
+        private final PlanInventaire plan;
+        private final XSSFWorkbook workbook;
+
+        public EcartExcelExportUtils(List<Ecart> ecarts, PlanInventaire plan) {
+            this.ecarts = ecarts;
+            this.plan = plan;
+            this.workbook = new XSSFWorkbook();
+        }
+
+        public void exportDataToExcel(HttpServletResponse response) throws IOException {
+            Sheet sheet = workbook.createSheet("Écarts d'inventaire");
+
+            // Add plan info
+            Row titleRow = sheet.createRow(0);
+            titleRow.createCell(0).setCellValue("Plan: " + plan.getNom());
+            Row dateRow = sheet.createRow(1);
+            dateRow.createCell(0).setCellValue("Période: " + 
+                plan.getDateDebut().format(DATE_FORMATTER) + " - " + 
+                plan.getDateFin().format(DATE_FORMATTER));
+
+            Row headerRow = sheet.createRow(3);
+            String[] headers = {
+                "Produit", "Code Barre", "Zone", "Qté Théorique",
+                "Qté Comptée", "Écart", "Date Validation", "Statut"
+            };
+
+            CellStyle headerStyle = createHeaderStyle();
+            CellStyle dataStyle = createDataStyle();
+
+            // Write headers
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // Write data
+            int rowNum = 4;
+            for (Ecart ecart : ecarts) {
+                Row row = sheet.createRow(rowNum++);
+                addDataRow(row, ecart, dataStyle);
+            }
+
+            // Autosize columns
+            for (int i = 0; i < headers.length; i++) {
+                sheet.autoSizeColumn(i);
+            }
+
+            workbook.write(response.getOutputStream());
+            workbook.close();
+        }
+
+        private void addDataRow(Row row, Ecart ecart, CellStyle style) {
+            createCell(row, 0, ecart.getProduit().getNom(), style);
+            createCell(row, 1, ecart.getProduit().getCodeBarre(), style);
+            createCell(row, 2, ecart.getProduit().getZones().stream()
+                    .map(z -> z.getName())
+                    .findFirst()
+                    .orElse("-"), style);
+            createCell(row, 3, String.valueOf(ecart.getQuantiteTheorique()), style);
+            createCell(row, 4, String.valueOf(ecart.getQuantiteComptee()), style);
+            createCell(row, 5, String.valueOf(ecart.getQuantiteComptee() - ecart.getQuantiteTheorique()), style);
+            createCell(row, 6, ecart.getDateValidation() != null ?
+                    ecart.getDateValidation().format(DATE_FORMATTER) : "-", style);
+            createCell(row, 7, ecart.getStatut().toString(), style);
+        }
+
+        private void createCell(Row row, int column, String value, CellStyle style) {
+            Cell cell = row.createCell(column);
+            cell.setCellValue(value);
+            cell.setCellStyle(style);
+        }
+
+        private CellStyle createHeaderStyle() {
+            CellStyle style = workbook.createCellStyle();
+            style.setFillForegroundColor(IndexedColors.ROYAL_BLUE.getIndex());
+            style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            style.setBorderBottom(BorderStyle.THIN);
+            style.setBorderTop(BorderStyle.THIN);
+            style.setBorderRight(BorderStyle.THIN);
+            style.setBorderLeft(BorderStyle.THIN);
+
+            XSSFFont font = workbook.createFont();
+            font.setBold(true);
+            font.setColor(IndexedColors.WHITE.getIndex());
+            style.setFont(font);
+            style.setAlignment(HorizontalAlignment.CENTER);
+            return style;
+        }
+
+        private CellStyle createDataStyle() {
+            CellStyle style = workbook.createCellStyle();
+            style.setBorderBottom(BorderStyle.THIN);
+            style.setBorderTop(BorderStyle.THIN);
+            style.setBorderRight(BorderStyle.THIN);
+            style.setBorderLeft(BorderStyle.THIN);
+            style.setAlignment(HorizontalAlignment.LEFT);
+            return style;
         }
     }
 }

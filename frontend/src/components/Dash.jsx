@@ -12,7 +12,7 @@ import LatestUpdates from './LatestUpdates';
 
 export default function Dash() {
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: { xs: 'column', md: 'row' } }}>
       <Sidebarsuper />
 
       <Box
@@ -20,18 +20,18 @@ export default function Dash() {
         sx={{
           flex: 1,
           px: { xs: 2, md: 6 },
-          pt: { xs: 'calc(12px + 56px)', md: 3 }, // assuming header height 56px
+          pt: { xs: 'calc(12px + 56px)', md: 3 },
           pb: { xs: 2, md: 3 },
           display: 'flex',
           flexDirection: 'column',
           gap: 2,
           minWidth: 0,
-          height: '100vh',
+          height: { md: '100vh' },
           overflowY: 'auto',
         }}
       >
-        {/* Breadcrumb */}
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        {/* Breadcrumbs */}
+        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
           <Breadcrumbs
             size="sm"
             aria-label="breadcrumbs"
@@ -44,13 +44,10 @@ export default function Dash() {
             <a href="#" style={{ fontSize: 12, fontWeight: 500, color: 'inherit', textDecoration: 'none' }}>
               Dashboard
             </a>
-            <Typography color="primary" sx={{ fontWeight: 500, fontSize: 12 }}>
-              Overview
-            </Typography>
           </Breadcrumbs>
         </Box>
 
-        {/* Header + action button */}
+        {/* Title Section */}
         <Box
           sx={{
             display: 'flex',
@@ -67,26 +64,27 @@ export default function Dash() {
           </Typography>
         </Box>
 
-     {/* Cards */} 
-<DashboardCards />
+        {/* Cards */}
+        <DashboardCards />
 
-<Box
-  sx={{
-    display: 'flex',
-    gap: 2,
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    mt: 2,
-  }}
->
-  <LatestUpdates />
-  <Box sx={{ flex: 1, minWidth: 280, maxWidth: 320 }}>
-    <PlanStatusChart />
-  </Box>
-</Box>
-
-
+        {/* Latest updates + Chart */}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            gap: 2,
+            mt: 2,
+            flexWrap: 'wrap',
+            alignItems: 'stretch',
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 280 }}>
+            <LatestUpdates />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 280 }}>
+            <PlanStatusChart />
+          </Box>
+        </Box>
       </Box>
     </Box>
   );

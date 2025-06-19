@@ -2,6 +2,7 @@ package com.example.backend.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ecarts")
@@ -14,23 +15,44 @@ public class Ecart {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private Integer quantiteTheorique;
+    @ManyToOne
+    @JoinColumn(name = "plan_inventaire_id")
+    private PlanInventaire planInventaire;
 
-    @Column(nullable = false)
+    @ManyToOne
+    private Produit produit;
+
+   private  EcartType type;
     private Integer quantiteComptee;
 
-    @Column(nullable = false)
+    // L'écart est calculé automatiquement
+    @Column(name = "ecart_quantite")
     private Integer ecartQuantite;
 
+    private LocalDateTime dateCreation = LocalDateTime.now();
+
+    @PrePersist
+    @PreUpdate
+    protected void calculateEcart() {
+        if (this.produit != null && this.quantiteComptee != null) {
+            this.ecartQuantite = this.quantiteComptee - this.produit.getQuantitetheo();
+        }
+    }
+
+    // Helper method to get la quantité théorique from Produit
+    public Integer getQuantiteTheorique() {
+        return this.produit != null ? this.produit.getQuantitetheo() : null;
+    }
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private EcartType type;
+    private EcartStatut statut = EcartStatut.EN_ATTENTE;
 
     private String justification;
+    private boolean demandeRecomptage = false;
 
-    @Column(nullable = false)
-    private boolean valide;
+    @ManyToOne
+    private Utilisateur validateur;
 
-    private boolean demandeRecomptage;
+    private LocalDateTime dateValidation;
 }
+

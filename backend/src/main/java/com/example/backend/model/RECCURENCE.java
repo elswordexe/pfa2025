@@ -1,8 +1,8 @@
 package com.example.backend.model;
 
 public enum RECCURENCE {
-    MENSUELLE,
+    MENSUEL,
     QUOTIDIENNE,
     TRIMESTRIELLE,
-    HEBDOMMADAIRE;
+    HEBDOMADAIRE;
 }

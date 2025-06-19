@@ -1,10 +1,12 @@
 package com.example.backend.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,27 +16,18 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class Category {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
+    
     private String name;
+    
+    @OneToMany(mappedBy = "category")
+    @JsonIgnoreProperties("category")
+    private List<SubCategory> subCategories = new ArrayList<>();
 
-    @ManyToMany
-    @JoinTable(
-        name = "category_produit",
-        joinColumns = @JoinColumn(name = "category_id"),
-        inverseJoinColumns = @JoinColumn(name = "produit_id")
-    )
+    @OneToMany(mappedBy = "category")
+    @JsonIgnoreProperties({"category", "zones", "subCategory"})
     private List<Produit> produits = new ArrayList<>();
-
-    @ManyToOne
-    @JoinColumn(name = "parent_category_id")
-    private Category parentCategory;
-
-    @OneToMany(mappedBy = "parentCategory")
-    private List<Category> subCategories = new ArrayList<>();
 }

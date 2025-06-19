@@ -1,7 +1,11 @@
 package com.example.backend.controller;
 
 import com.example.backend.model.Category;
+import com.example.backend.model.SubCategory;
 import com.example.backend.repository.CategorieRepository;
+import com.example.backend.repository.SubCategoryRepository;
+import com.example.backend.dto.CategoryDTO;
+import com.example.backend.dto.SubCategoryDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -12,60 +16,84 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
+
+
 
 @RestController
 @RequestMapping("/api/categories")
 @CrossOrigin("*")
-@Tag(name="categories" ,description="Api des categories")
+@Tag(name = "Categories Management", description = "APIs pour gérer les catégories")
 public class CategoryController {
 
     @Autowired
-    private CategorieRepository categorieRepository;
+    private CategorieRepository categoryRepository;
 
-    @Operation(summary ="recuperation de la catgeorie", description = "gayrouha dba blawlid dial lbatali")
-    @ApiResponse(responseCode = "200", description = "categories list")
+    @Autowired
+    private SubCategoryRepository subcategoryRepository;
+
+    @Operation(summary = "Récupération des catégories")
+    @ApiResponse(responseCode = "200", description = "Liste des catégories")
     @GetMapping
-    public ResponseEntity<List<Category>> getAllCategories() {
-        List<Category> rootCategories = categorieRepository.findAll().stream()
-                .filter(category -> category.getParentCategory() == null)
-                .collect(Collectors.toList());
-        return ResponseEntity.ok(rootCategories);
-    }
-    @Operation(summary="creation des categories" ,description="Api des categories")
-    @ApiResponse(responseCode = "200", description = "categories list")
-    @PostMapping
-    public ResponseEntity<Category> createCategory(@RequestBody Category category) {
+    public ResponseEntity<List<CategoryDTO>> getAllCategories() {
         try {
-            if (category.getParentCategory() != null && category.getParentCategory().getId() != null) {
-                Category parentCategory = categorieRepository.findById(category.getParentCategory().getId())
-                        .orElseThrow(() -> new RuntimeException("category Parent non trouve"));
-                category.setParentCategory(parentCategory);
-            }
-            Category savedCategory = categorieRepository.save(category);
-            return new ResponseEntity<>(savedCategory, HttpStatus.CREATED);
+            List<Category> categories = categoryRepository.findAll();
+            List<CategoryDTO> dtos = categories.stream()
+                .map(category -> {
+                    CategoryDTO dto = new CategoryDTO();
+                    dto.setId(category.getId());
+                    dto.setName(category.getName());
+                    dto.setSubCategories(category.getSubCategories().stream()
+                        .map(sub -> {
+                            SubCategoryDTO subDto = new SubCategoryDTO();
+                            subDto.setId(sub.getId());
+                            subDto.setName(sub.getName());
+                            return subDto;
+                        })
+                        .collect(Collectors.toList()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+            return ResponseEntity.ok(dtos);
         } catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }}
-    @Operation(summary ="update de category")
-    @ApiResponse( responseCode= "200", description = "updatelist")
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Operation(summary = "Création d'une catégorie")
+    @ApiResponse(responseCode = "201", description = "Catégorie créée")
+    @PostMapping
+    public ResponseEntity<CategoryDTO> createCategory(@RequestBody Category category) {
+        try {
+            Optional<Category> existingCategoryOpt = categoryRepository.findByName(category.getName());
+        
+            Category savedCategory;
+            if (existingCategoryOpt.isPresent()) {
+                savedCategory = existingCategoryOpt.get();
+                return new ResponseEntity<>(convertToDTO(savedCategory), HttpStatus.OK);
+            }
+
+            savedCategory = categoryRepository.save(category);
+            return new ResponseEntity<>(convertToDTO(savedCategory), HttpStatus.CREATED);
+        
+    } catch (Exception e) {
+        e.printStackTrace();
+        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+}
+
+    @Operation(summary = "Mise à jour d'une catégorie")
+    @ApiResponse(responseCode = "200", description = "Catégorie mise à jour")
     @PutMapping("/{id}")
     public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody Category categoryDetails) {
         try {
-            Category category = categorieRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Category pas trouvavec id " + id));
+            Category category = categoryRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée avec l'id " + id));
 
             category.setName(categoryDetails.getName());
-            
-            if (categoryDetails.getParentCategory() != null && categoryDetails.getParentCategory().getId() != null) {
-                Category parentCategory = categorieRepository.findById(categoryDetails.getParentCategory().getId())
-                        .orElseThrow(() -> new RuntimeException("category Parent non trouve"));
-                category.setParentCategory(parentCategory);
-            } else {
-                category.setParentCategory(null);
-            }
-
-            Category updatedCategory = categorieRepository.save(category);
+            Category updatedCategory = categoryRepository.save(category);
             return ResponseEntity.ok(updatedCategory);
         } catch (RuntimeException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -73,25 +101,26 @@ public class CategoryController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-    @Operation(summary = "suppression de la catgeorie", description = "gayrouha dba blawlid dial lbatali")
+
+    @Operation(summary = "Suppression d'une catégorie")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Utilisateur enregistré avec succès"),
-            @ApiResponse(responseCode = "400", description = "Données d'utilisateur invalides")
+        @ApiResponse(responseCode = "200", description = "Catégorie supprimée"),
+        @ApiResponse(responseCode = "400", description = "Impossible de supprimer la catégorie")
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteCategory(@PathVariable Long id) {
         try {
-            Category category = categorieRepository.findById(id)
-                    .orElseThrow(() -> new RuntimeException("Categort introuvable: " + id));
+            Category category = categoryRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Catégorie introuvable: " + id));
 
             if (!category.getSubCategories().isEmpty()) {
-                return new ResponseEntity<>("impo supprimer category si il a des sub", HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>("Impossible de supprimer une catégorie avec des sous-catégories", HttpStatus.BAD_REQUEST);
             }
             if (!category.getProduits().isEmpty()) {
-                return new ResponseEntity<>("impo supprimer category si il a des prod", HttpStatus.BAD_REQUEST);
+                return new ResponseEntity<>("Impossible de supprimer une catégorie avec des produits", HttpStatus.BAD_REQUEST);
             }
 
-            categorieRepository.delete(category);
+            categoryRepository.delete(category);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -99,4 +128,89 @@ public class CategoryController {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
+
+    @Operation(summary = "Récupérer les sous-catégories")
+    @ApiResponse(responseCode = "200", description = "Liste des sous-catégories")
+    @GetMapping("/{categoryId}/sous-categories")
+    public ResponseEntity<List<SubCategory>> getSubCategories(@PathVariable Long categoryId) {
+        try {
+            List<SubCategory> subCategories = subcategoryRepository.findByCategoryId(categoryId);
+            return ResponseEntity.ok(subCategories);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Operation(summary = "Ajouter une sous-catégorie")
+    @ApiResponse(responseCode = "201", description = "Sous-catégorie créée")
+    @PostMapping("/{categoryId}/sous-categories")
+    public ResponseEntity<SubCategory> addSubCategory(
+            @PathVariable Long categoryId,
+            @RequestBody SubCategory subCategory) {
+        try {
+            Category category = categoryRepository.findById(categoryId)
+                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+
+            subCategory.setCategory(category);
+            SubCategory savedSubCategory = subcategoryRepository.save(subCategory);
+            
+            return new ResponseEntity<>(savedSubCategory, HttpStatus.CREATED);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @Operation(summary = "Supprimer une sous-catégorie")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Sous-catégorie supprimée"),
+        @ApiResponse(responseCode = "400", description = "Impossible de supprimer la sous-catégorie")
+    })
+    @DeleteMapping("/{categoryId}/sous-categories/{subCategoryId}")
+    public ResponseEntity<?> deleteSubCategory(
+            @PathVariable Long categoryId,
+            @PathVariable Long subCategoryId) {
+        try {
+            SubCategory subCategory = subcategoryRepository.findById(subCategoryId)
+                    .orElseThrow(() -> new RuntimeException("Sous-catégorie non trouvée"));
+
+            if (!subCategory.getCategory().getId().equals(categoryId)) {
+                return ResponseEntity.badRequest()
+                    .body("Cette sous-catégorie n'appartient pas à la catégorie spécifiée");
+            }
+
+            if (!subCategory.getProduits().isEmpty()) {
+                return ResponseEntity.badRequest()
+                    .body("Impossible de supprimer une sous-catégorie contenant des produits");
+            }
+
+            subcategoryRepository.delete(subCategory);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+private CategoryDTO convertToDTO(Category category) {
+    if (category == null) {
+        return null;
+    }
+    
+    List<SubCategoryDTO> subCategoryDTOs = category.getSubCategories() == null ? 
+        List.of() :
+        category.getSubCategories().stream()
+            .map(sub -> new SubCategoryDTO(
+                sub.getId(),
+                sub.getName())
+            )
+            .collect(Collectors.toList());
+            
+    return new CategoryDTO(
+        category.getId(),
+        category.getName(),
+        subCategoryDTOs
+    );
+}
 }
