@@ -42,11 +42,50 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults())  // active CORS avec ta config corsConfigurationSource()
                 .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()  // aucune restriction de sécurité
+                        .requestMatchers("/produits","/api/plans/**","produits/byZone/*","Zone/all","api/plans/names-dates","produits/names-dates","produits","users/countAdminClient","api/plans/countByStatus","users/names-dates","api/plans/countterminer","produits/count","Zone/count","/users/login","users/countAgentInventaire", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        //checkup management
+                        .requestMatchers(HttpMethod.POST,"/checkups/ajouter","/checkups/scan").hasAnyAuthority("AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.PUT,"/checkups/{checkupId}/recomptage","/checkups/{checkupId}/valider").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.GET,"/checkups/plan/{id}","/checkups/plan/{planId}/logs","/checkupsplan/{planId}/type/{type}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        // User management
+                        .requestMatchers(HttpMethod.GET ,"/users","users/count","users/countAdminClient").hasAnyAuthority("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET ,"/users/agents","AgentInventaire","users/countAgentInventaire","users/names-dates").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.POST,"/users/client-admin/**").hasAnyAuthority("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.POST,"users/agent-inventaire/{clientId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.DELETE,"/users/{userId}").hasAnyAuthority("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT,"/users/{userId}").hasAnyAuthority("SUPER_ADMIN")
+                    .requestMatchers(HttpMethod.POST,"AgentInventaire/assign/{planId}/{agentId}/{zoneId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        // Client management
+                        .requestMatchers(HttpMethod.GET, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.POST, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
+                        //Categ
+                        .requestMatchers(HttpMethod.GET, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.POST, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.PUT, "/api/categories/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
+                        //plans
+                        .requestMatchers(HttpMethod.GET,"api/plans","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.GET, "api/plans/{planId}/produits","api/plans/{planId}/details","api/plans/{planId}/zone-products").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.POST, "api/plans","api/plans/{planId}/zones","api/plans/{planId}/produits","{planId}/produits/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.PUT, "api/plans/{planId}/statut","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        // Zone manage
+                        .requestMatchers(HttpMethod.GET, "Zone/all","Zones/{zoneId}/products","Zone/count").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.POST, "Zone","Zones/{zoneId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.PUT, "/Zone/update/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.DELETE, "Zones/{zoneId}","Zones/{zoneId}/products/{productId}").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
+                        //lkhrin authaut
+                        .anyRequest().authenticated()
                 )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 

@@ -6,14 +6,14 @@ import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import Breadcrumbs from '@mui/joy/Breadcrumbs';
 import PlanStatusChart from './PlanStatusChart';
-import Sidebarsuper from './SidebarSuper';
+import Sidebar from './Sidebar';
 import DashboardCardSuper from './DashboardCardSuper';
 import LatestUpdates from './LatestUpdatesSuper';
 
 export default function DashSuper() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: { xs: 'column', md: 'row' } }}>
-      <Sidebarsuper />
+      <Sidebar />
 
       <Box
         component="main"

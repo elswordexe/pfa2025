@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Sidebarsuper from '../components/Sidebar';
 import axios from 'axios';
 import { useTheme, useMediaQuery } from '@mui/material';
@@ -33,30 +33,44 @@ const Inventory = () => {
   const[ProdcutStatus, setProductStatus] = useState([]);
   const [planDetails, setPlanDetails] = useState({});
   const [selectedProduct, setSelectedProduct] = useState(null);
- useEffect(() => {
-  const fetchPlans = async () => {
-    try {
-      const response = await axios.get('http://localhost:8080/api/plans');
-      const plans = Array.isArray(response.data) ? response.data : [response.data];
+  // Ref pour savoir si c'est la toute première charge
+  const firstLoadRef = useRef(true);
 
-      setAvailablePlans(prevPlans => {
-        const newData = JSON.stringify(plans);
-        const oldData = JSON.stringify(prevPlans);
-        return newData !== oldData ? plans : prevPlans;
-      });
-    } catch (error) {
-      console.error('Error fetching plans:', error);
-      setAvailablePlans([]); // Only if you want to clear it on error
-      setError('Failed to load plans');
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const token = localStorage.getItem('token'); 
+          const decoded = token ? JSON.parse(atob(token.split('.')[1])) : null;
+    const userId = decoded?.id;
+  const userRole = decoded?.role;
+
+  const response = await axios.get('http://localhost:8080/api/plans');
+    let plans = Array.isArray(response.data) ? response.data : [response.data];
+
+    if (userRole === 'ADMIN_CLIENT') {
+  plans = plans.filter(plan => plan.createur?.id === userId);
     }
-  };
-   fetchPlans();
-  const interval = setInterval(fetchPlans, 5000);
-  return () => clearInterval(interval);
-}, []);
+
+        setAvailablePlans(prevPlans => {
+          const newData = JSON.stringify(plans);
+          const oldData = JSON.stringify(prevPlans);
+          return newData !== oldData ? plans : prevPlans;
+        });
+      } catch (error) {
+        console.error('Error fetching plans:', error);
+        setAvailablePlans([]); // Only if you want to clear it on error
+        setError('Failed to load plans');
+      }
+    };
+    fetchPlans();
+    //const interval = setInterval(fetchPlans, 5000);
+   // return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {    const fetchZonesAndPlan = async () => {
-      setLoading(true);
+      if (firstLoadRef.current) {
+        setLoading(true);
+      }
       try {
         // 1. Fetch all zones first
         const zonesRes = await axios.get('http://localhost:8080/Zone/all');
@@ -166,13 +180,16 @@ const Inventory = () => {
         console.error('Error fetching data:', error);
         setError(error.message);
       } finally {
-        setLoading(false);
+        if (firstLoadRef.current) {
+          setLoading(false);
+          firstLoadRef.current = false;
+        }
       }
     };
 
     fetchZonesAndPlan();
-    const interval = setInterval(fetchZonesAndPlan, 5000); // fetch every 5s
-    return () => clearInterval(interval);
+    //const interval = setInterval(fetchZonesAndPlan, 5000); // fetch every 5s
+    //return () => clearInterval(interval);
   }, [planId]);
 
   const refreshCheckups = async () => {
@@ -188,61 +205,85 @@ const Inventory = () => {
     }
   };
 
-  const handleRaccomptage = async (checkupId) => {
+  const handleRaccomptage = async (checkupId, produitId) => {
+  if (!checkupId) {
+    const tempId = `temp_${produitId}_${Date.now()}`;
+    setSelectedCheckupId(tempId);
+    setSelectedProduct(produitId);
+  } else {
     setSelectedCheckupId(checkupId);
-    setShowJustificationModal(true);
-  };
+  }
+  setShowJustificationModal(true);
+};
 
-  const submitRecomptage = async () => {
-    if (!justification.trim()) {
-      toast.error("Veuillez fournir une justification");
-      return;
-    }
+ const submitRecomptage = async () => {
+  if (!justification.trim()) {
+    toast.error("Veuillez fournir une justification");
+    return;
+  }
 
-    try {
-      toast.info('Traitement de la demande de recomptage...', {
-        toastId: 'recomptage-start'
-      });
+  if (!selectedCheckupId) {
+    toast.error("Aucun contrôle sélectionné");
+    return;
+  }
 
+  try {
+    toast.info('Traitement de la demande de recomptage...', {
+      toastId: 'recomptage-start'
+    })
     
-      await axios.put(`http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, {
-        demandeRecomptage: true,
-        justification: justification
-      });
+    await axios.put(`http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, {
+      justification: justification
+    });
+
 
   
-      const checkup = [...manualCheckups, ...scanCheckups].find(c => c.id === selectedCheckupId);
-      if (checkup && checkup.produitId) {
-       
-        const zone = checkup.zoneId || selectedZone;
-        await axios.put(`http://localhost:8080/produits/${checkup.produitId}/zones/${zone}/updateQuantite`, {
-          quantiteManuelle: 0,
-          quantiteScannee: 0,
-          status: 'A_RECOMPTER'
-        });
-
-        toast.success('Quantités réinitialisées', {
-          toastId: 'quantities-reset'
-        });
+   const checkup = [...manualCheckups, ...scanCheckups].find(c => c.id === selectedCheckupId);
+       if (checkup) {
+      // Extraire produitId depuis les détails du checkup
+      const produitId = checkup.details?.[0]?.produit?.id;
+      
+      if (produitId) {
+        // 3. Réinitialiser les quantités pour toutes les zones du produit
+        const product = planproducts.find(p => p.id === produitId);
+        if (product && product.zones) {
+          // Réinitialiser pour chaque zone où le produit est présent
+          for (const zone of product.zones) {
+            try {
+              await axios.put(`http://localhost:8080/produits/${produitId}/zones/${zone.id}/updateQuantite`, {
+                quantiteManuelle: 0,
+                quantiteScannee: 0
+              });
+            } catch (zoneError) {
+              console.error(`Erreur lors de la réinitialisation pour la zone ${zone.id}:`, zoneError);
+            }
+          }
+          
+          toast.success('Quantités réinitialisées pour toutes les zones', {
+            toastId: 'quantities-reset'
+          });
+        }
       }
-
-      await refreshCheckups();
-      await refreshData();
-
-      setShowJustificationModal(false);
-      setJustification('');
-      setSelectedCheckupId(null);
-
-      toast.success('Recomptage initié avec succès', {
-        toastId: 'recomptage-success'
-      });
-    } catch (error) {
-      console.error('Error during recount process:', error);
-      toast.error("Erreur lors de la demande de recomptage", {
-        toastId: 'recomptage-error'
-      });
     }
-  };  const handleValider = async (checkupId, produitId, scannedQty, manualQty, theoreticalQty) => {
+
+    await refreshCheckups();
+    await refreshData();
+
+    setShowJustificationModal(false);
+    setJustification('');
+    setSelectedCheckupId(null);
+
+    toast.success('Recomptage initié avec succès', {
+      toastId: 'recomptage-success'
+    });
+  }  catch (error) {
+    console.error('Error during recount process:', error);
+    toast.error(`Erreur lors de la demande de recomptage: ${error.response?.data?.message || error.message}`, {
+      toastId: 'recomptage-error'
+    });
+  }
+};
+  const handleValider = async (checkupId, produitId, scannedQty, manualQty, theoreticalQty) => {
     const scanned = Number(scannedQty);
     const manual = Number(manualQty);
     const theoretical = Number(theoreticalQty);
@@ -273,7 +314,7 @@ const Inventory = () => {
 
         await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
           quantiteTheorique: quantiteTheorique,
-          SetS: 'VERIFIE'
+          status: 'VERIFIE'
         });
         
         toast.success('Quantité théorique mise à jour', {
@@ -288,7 +329,11 @@ const Inventory = () => {
           });
         }
 
-        await refreshData(); // Recharger toutes les données
+        // Supprimer le produit du plan côté backend puis côté state
+        await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`);
+
+        setPlanProducts(prev => prev.filter(p => p.id !== produitId));
+        await refreshData();
       } catch (error) {
         console.error('Error updating quantities:', error);
         toast.error('Erreur lors de la mise à jour');
@@ -303,7 +348,7 @@ const Inventory = () => {
         // Mise à jour de la quantité théorique et du statut
         await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
           quantiteTheorique: Number(manual),
-          setProductStatus: 'VERIFIE'
+          status: 'VERIFIE'
         });
         
         toast.success('Quantité théorique mise à jour', {
@@ -318,7 +363,11 @@ const Inventory = () => {
           });
         }
 
-        await refreshData(); // Recharger toutes les données
+        // Supprimer le produit du plan côté backend puis côté state
+        await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`);
+
+        setPlanProducts(prev => prev.filter(p => p.id !== produitId));
+        await refreshData();
       } catch (error) {
         console.error('Error validating checkup:', error);
         toast.error('Erreur lors de la validation');
@@ -360,17 +409,13 @@ const Inventory = () => {
       try {
         setLoading(true);
         const [productsRes, scanRes, manualRes] = await Promise.all([
-          axios.get(`http://localhost:8080/api/produits/plan/${planId}`),
-          axios.get(`http://localhost:8080/api/checkups/scan/plan/${planId}`),
-          axios.get(`http://localhost:8080/api/checkups/manual/plan/${planId}`)
+          axios.get(`http://localhost:8080/api/plans/${planId}/produits`),
+          axios.get(`http://localhost:8080/checkups/scan/plan/${planId}`),
+          axios.get(`http://localhost:8080/checkups/manual/plan/${planId}`)
         ]);
 
-        const productsWithStatus = productsRes.data.map(product => ({
-          ...product,
-          status: product.status || 'EN_ATTENTE'
-        }));
-
-        setPlanProducts(productsWithStatus);
+      
+        setPlanProducts(updatedProducts);
         setScanCheckups(scanRes.data);
         setManualCheckups(manualRes.data);
       } catch (error) {
@@ -382,8 +427,8 @@ const Inventory = () => {
     };
 
     initialLoad();
-    const interval = setInterval(silentUpdate, 5000);
-    return () => clearInterval(interval);
+   // const interval = setInterval(silentUpdate, 5000);
+    //return () => clearInterval(interval);
   }, [planId]);
 
   // Add refresh function
@@ -394,15 +439,10 @@ const Inventory = () => {
   const silentUpdate = async () => {
     try {
       const [productsRes, scanRes, manualRes] = await Promise.all([
-        axios.get(`http://localhost:8080/api/produits/plan/${planId}`),
-        axios.get(`http://localhost:8080/api/checkups/scan/plan/${planId}`),
-        axios.get(`http://localhost:8080/api/checkups/manual/plan/${planId}`)
+        axios.get(`http://localhost:8080/api/plans/${planId}/produits`),
+        axios.get(`http://localhost:8080/checkups/scan/plan/${planId}`),
+        axios.get(`http://localhost:8080/checkups/manual/plan/${planId}`)
       ]);
-
-      const updatedProducts = productsRes.data.map(product => ({
-        ...product,
-        status: product.status || 'EN_ATTENTE'
-      }));
 
       setPlanProducts(prevProducts => {
         // Ne mettre à jour que si les données ont changé
@@ -424,35 +464,8 @@ const Inventory = () => {
   };
 
   const getButtonStatus = (product, scannedQty, manualQty) => {
-    // Vérifie si le produit a le status VERIFIE
-    if (product.status === 'VERIFIE') {
-      return {
-        validate: { disabled: true, text: 'Vérifié' },
-        recount: { disabled: true, text: 'Recomptage indisponible' }
-      };
-    }
-
-    // Vérifie si le produit est en cours de recomptage
-    if (product.status === 'A_RECOMPTER') {
-      return {
-        validate: { disabled: true, text: 'En recomptage' },
-        recount: { disabled: true, text: 'Recomptage en cours' }
-      };
-    }
-
-    // Vérifie si les quantités manuelles sont disponibles
-    const hasManualQty = !isNaN(manualQty) && manualQty !== null && manualQty !== undefined;
-    
-    return {
-      validate: { 
-        disabled: !hasManualQty, 
-        text: hasManualQty ? 'Valider' : 'Non disponible' 
-      },
-      recount: {
-        disabled: false,
-        text: 'Recompter'
-      }
-    };
+    // Si produit absent (sera supprimé après validation) pas besoin d'action
+    return null;
   };
 
   if (loading) {
@@ -677,7 +690,6 @@ const Inventory = () => {
                       <th className="p-4 text-right">Manuel</th>
                       <th className="p-4 text-right">Scan</th>
                       <th className="p-4 text-center">Écart</th>
-                      <th className="p-4 text-center">Statut</th>
                       <th className="p-4 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -742,45 +754,36 @@ const Inventory = () => {
                                 {manual !== "-" ? manual - theoreticalQty : "-"}
                               </span>
                             </td>
-                            <td className="p-4 text-center">
-                              {product.status === 'VERIFIE' ? (
-                                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                                  ✓ Vérifié
-                                </span>
-                              ) : (
-                                <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">
-                                  En attente
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-4 text-center">
-                              <div className="flex justify-center gap-2">
-                                <button
-                                  onClick={() => handleValider(
-                                    manualDetail?.checkupId,
-                                    product.id,
-                                    scanned,
-                                    manual,
-                                    theoreticalQty,
-                                  )}
-                                  className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-medium transition"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                                  </svg>
-                                  Valider
-                                </button>
-                                <button
-                                  onClick={() => handleRaccomptage(manualDetail?.checkupId)}
-                                  className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm font-medium transition"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                  </svg>
-                                  Recompter
-                                </button>
-                              </div>
-                            </td>
+                            {product.status !== 'VERIFIE' && (
+                              <td className="p-4 text-center">
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    onClick={() => handleValider(
+                                      manualDetail?.checkupId,
+                                      product.id,
+                                      scanned,
+                                      manual,
+                                      theoreticalQty,
+                                    )}
+                                    className="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-medium transition"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Valider
+                                  </button>
+                                  <button
+                                    onClick={() => handleRaccomptage(manualDetail?.checkupId)}
+                                    className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm font-medium transition"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Recompter
+                                  </button>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
@@ -875,7 +878,9 @@ const Inventory = () => {
                                           {manual !== "-" ? manual - theoreticalQty : "-"}
                                         </span>
                                       </td>                      <td className="p-3 text-center">
-                              <div className="flex justify-center gap-2">                                <button
+                              {product.status !== 'VERIFIE' && (
+                                <div className="flex justify-center gap-2">
+                                <button
                                   onClick={() => {
                                     const canValidate = manual || scanned;
                                     if (!canValidate) {
@@ -932,10 +937,11 @@ const Inventory = () => {
                                             Recompter
                                           </button>
                                         </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>

@@ -41,18 +41,8 @@ public class ZoneController {
     public Iterable<Zone> getAllZones(){
         return zoneRepository.findAll();
     }
-    @Operation(summary = "crée des nouveaux zones")
-    @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "crée avec succes"),@ApiResponse(responseCode = "400", description = "erreur")}
-
-    )
-    @PostMapping("Zones")
-    public ResponseEntity<?> addZone(@RequestBody Zone zone){
-        Zone zone1 = zoneRepository.save(zone);
-        return ResponseEntity.ok(zone1);
-    }
     @Operation(summary = "ajouter des produits aux zones")
     @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "ajouter avec succes"),@ApiResponse(responseCode = "400", description = "erreur")}
-
     )
     @PostMapping("Zones/{zoneId}")
     @Transactional
@@ -82,15 +72,7 @@ public class ZoneController {
         Zone updatedZone = zoneRepository.save(zone);
         return ResponseEntity.ok(updatedZone);
     }
-    @Operation(summary = "mise a jour de la zone")
-    @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "mise a jour avec succes"),@ApiResponse(responseCode = "400", description = "erreur")}
 
-    )
-    @PutMapping("Zones/{zoneId}")
-    public ResponseEntity<?> updateZone(@PathVariable Long zoneId, @RequestBody Zone zone){
-        Zone zone1 = zoneRepository.save(zone);
-        return ResponseEntity.ok(zone1);
-    }
     @Operation(summary = "supprimer la zone par id")
     @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "supprimer la zone avec succes"),@ApiResponse(responseCode = "400", description = "erreur")}
 
@@ -180,11 +162,7 @@ public class ZoneController {
         Zone existingZone = existingZoneOpt.get();
         existingZone.setName(zoneDTO.getName());
         existingZone.setDescription(zoneDTO.getDescription());
-
-        // Clear existing products
         existingZone.getZoneProduits().clear();
-
-        // Add new products with quantities
         if (zoneDTO.getZoneProduits() != null) {
             for (ZoneProduitDTO zpDTO : zoneDTO.getZoneProduits()) {
                 Optional<Produit> produitOpt = produitRepository.findById(zpDTO.getProduitId());

@@ -10,7 +10,6 @@ import com.example.backend.repository.PlanInventaireRepository;
 import com.example.backend.service.EcartService;
 import com.example.backend.service.PdfExportService;
 import com.example.backend.util.ExportUtil;
-import com.example.backend.util.ThymeleafPdfGenerator;
 import com.itextpdf.text.DocumentException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -76,57 +75,6 @@ public class EcartController {
         }
     }
 
-   @GetMapping("/ecarts/export/pdf")
-public void exportEcartsPdf(@RequestParam Long planId, HttpServletResponse response) throws IOException {
-    try {
-
-        PlanInventaire plan = planInventaireRepository.findById(planId)
-            .orElseThrow(() -> new RuntimeException("Plan non trouvé"));
-
-        List<Zone> zones = (List<Zone>) plan.getZones();
-        int totalProducts = 0;
-        int conformProducts = 0;
-        int nonConformProducts = 0;
-
-        for (Zone zone : zones) {
-            for (ZoneProduit zp : zone.getZoneProduits()) {
-                totalProducts++;
-                if (zp.getQuantiteTheorique() == zp.getQuantiteReelle()) {
-                    conformProducts++;
-                } else {
-                    nonConformProducts++;
-                }
-            }
-        }
-
-        double conformityRate = totalProducts > 0 
-            ? (conformProducts * 100.0 / totalProducts) 
-            : 0;
-
-
-        response.setContentType("application/pdf");
-        response.setHeader("Content-Disposition", "attachment; filename=ecarts-inventaire.pdf");
-
-        Context context = new Context();
-        context.setVariable("plan", plan);
-        context.setVariable("zones", zones);
-        context.setVariable("totalProducts", totalProducts);
-        context.setVariable("conformProducts", conformProducts);
-        context.setVariable("nonConformProducts", nonConformProducts);
-        context.setVariable("conformityRate", conformityRate);
-
-        // Generate PDF
-        ThymeleafPdfGenerator.generatePdf(
-            "ecarts-inventaire-pdf",  // template name
-            context,
-            response.getOutputStream()
-        );
-
-    } catch (Exception e) {
-        response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-            "Erreur lors de la génération du PDF: " + e.getMessage());
-    }
-}
 
     @GetMapping("/export/xlsx")
     public void exportEcartsExcel(

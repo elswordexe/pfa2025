@@ -58,7 +58,7 @@ const InventairePlan = () => {
     fetchZonesAndAgents();
     fetchProducts();
   }, []);
-
+  
   const fetchZonesAndAgents = async () => {
     try {
       const [zonesRes, agentsRes] = await Promise.all([
@@ -93,25 +93,28 @@ const InventairePlan = () => {
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
+  const token = localStorage.getItem('token');
+  const decoded = token ? JSON.parse(atob(token.split('.')[1])) : null;
+  const userId = decoded?.id;
   setError(null);
 
-  try {
-    // Préparer les données
+  try { 
     const requestData = {
-      nom: plan.nom,
-      dateDebut: plan.dateDebut,
-      dateFin: plan.dateFin,
-      type: plan.type,
-      zones: plan.zones.map(zoneId => ({
-        id: typeof zoneId === 'string' ? parseInt(zoneId) : zoneId
-      })),
-      produits: plan.produits.map(produitId => ({
-        id: typeof produitId === 'string' ? parseInt(produitId) : produitId
-      })),
-      statut: "Indefini"
-    };      // Afficher le format exact pour vérification
+  nom: plan.nom,
+  dateDebut: plan.dateDebut,
+  dateFin: plan.dateFin,
+  type: plan.type,
+  zones: plan.zones.map(zoneId => ({
+    id: typeof zoneId === 'string' ? parseInt(zoneId) : zoneId
+  })),
+  produits: plan.produits.map(produitId => ({
+    id: typeof produitId === 'string' ? parseInt(produitId) : produitId
+  })),
+  statut: "Indefini",
+  createur: { id: userId }
+};
       const jsonData = JSON.stringify(requestData, null, 2);
-      console.log('Données envoyées (format exact Postman):', jsonData);      // Création du plan - exactement comme dans Postman
+      console.log('Données envoyées (format exact Postman):', jsonData);
       const response = await fetch('http://localhost:8080/api/plans', {
         method: 'POST',
         headers: {
@@ -119,7 +122,7 @@ const handleSubmit = async (e) => {
           'Accept': '*/*'
         },
         body: jsonData
-    });      // Lire la réponse JSON
+    }); 
       const responseData = await response.json();
       console.log('Réponse du serveur:', responseData);
 

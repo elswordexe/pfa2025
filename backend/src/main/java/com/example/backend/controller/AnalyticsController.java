@@ -27,8 +27,6 @@ public class AnalyticsController {
     @GetMapping("/plans/stats")
     public ResponseEntity<List<Map<String, Object>>> getPlanStats() {
         List<Map<String, Object>> stats = new ArrayList<>();
-        
-        // Get monthly stats for plans
         Map<String, Integer> completedPlans = planRepository.countByStatutGroupByMonth(STATUS.Termine);
         Map<String, Integer> totalPlans = planRepository.countAllGroupByMonth();
         

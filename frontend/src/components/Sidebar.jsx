@@ -16,7 +16,6 @@ import MenuIcon from '@mui/icons-material/Menu';
 import WindowIcon from '@mui/icons-material/Window';
 import ShowChartRoundedIcon from '@mui/icons-material/ShowChartRounded';
 import PeopleIcon from '@mui/icons-material/PeopleAltRounded';
-import SettingIcon from '@mui/icons-material/BuildRounded';
 import InventoryIcon from './InventoryIcon';
 import MapIcon from '@mui/icons-material/MapRounded';
 import CategoryIcon from '@mui/icons-material/Category';
@@ -24,26 +23,60 @@ import AddBoxIcon from '@mui/icons-material/AddBox';
 import ListIcon from '@mui/icons-material/List';
 import Inventory from '@mui/icons-material/Inventory';
 import LocationPinIcon from '@mui/icons-material/LocationPin';
+import LogoutIcon from '@mui/icons-material/Logout';
 const drawerWidth = 240;
-const userRole = localStorage.getItem('userRole'); 
-const navItems = [
-  { label: 'Overview', icon: <WindowIcon />, path: '/dashboard' },
-  { label: 'Analytics', icon: <ShowChartRoundedIcon />, path: '/analytics' },
-  { label: 'Inventory', icon: <Inventory />, path: '/inventory' },
-  { label: 'Plans', icon: <MapIcon />, path: '/plans' },
-  { 
-    label: 'Products', 
-    icon: <CategoryIcon />, 
-    path: '/products',
+
+const getNavItems = (role) => {
+  const commonProducts = {
+    label: 'Products',
+    icon: <CategoryIcon />,
     subItems: [
       { label: 'Product List', icon: <ListIcon />, path: '/produits' },
       { label: 'Add Product', icon: <AddBoxIcon />, path: '/produits/ajouter' },
-    ]
-  },
-  { label: 'Zones', icon: <LocationPinIcon/>, path: '/zones' },
-  { label: 'Users', icon: <PeopleIcon />, path: '/users' },
-  { label: 'Settings', icon: <SettingIcon />, path: '/settings' },
-];
+    ],
+  };
+
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return [
+        { label: 'Overview', icon: <WindowIcon />, path: '/dashsuperadmin' },
+        { label: 'Analytics', icon: <ShowChartRoundedIcon />, path: '/analytics' },
+        { label: 'Inventory', icon: <Inventory />, path: '/inventory' },
+        { label: 'Plans Management', icon: <MapIcon />, path: '/plans-management' },
+        commonProducts,
+        { label: 'Zones', icon: <LocationPinIcon />, path: '/zones' },
+        { label: 'Clients', icon: <PeopleIcon />, path: '/clients' },
+        { label: 'Users', icon: <PeopleIcon />, path: '/users' },
+        { label: 'Logout', icon: <LogoutIcon />, action: 'logout' },
+      ];
+    case 'ADMIN_CLIENT':
+      return [
+        { label: 'Overview', icon: <WindowIcon />, path: '/dashboard' },
+        { label: 'Analytics', icon: <ShowChartRoundedIcon />, path: '/analytics' },
+        { label: 'Inventory', icon: <Inventory />, path: '/inventory' },
+        { label: 'Plans', icon: <MapIcon />, path: '/plans' },
+        commonProducts,
+        { label: 'Zones', icon: <LocationPinIcon />, path: '/zones' },
+        { label: 'Logout', icon: <LogoutIcon />, action: 'logout' },
+        { label: 'Users', icon: <PeopleIcon />, path: '/users' },
+      ];
+    case 'AGENT_INVENTAIRE':
+      return [
+        { label: 'Overview', icon: <WindowIcon />, path: '/dashboard' },
+        { label: 'Inventory', icon: <Inventory />, path: '/inventory' },
+        { label: 'Plans', icon: <MapIcon />, path: '/plans' },
+        commonProducts,
+        { label: 'Zones', icon: <LocationPinIcon />, path: '/zones' },
+      ];
+    default:
+      return [
+        { label: 'Overview', icon: <WindowIcon />, path: '/dashboard' },
+        { label: 'Plans', icon: <MapIcon />, path: '/plans' },
+        commonProducts,
+        { label: 'Logout', icon: <LogoutIcon />, action: 'logout' },
+      ];
+  }
+};
 
 export const Sidebar = () => {
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -51,6 +84,8 @@ export const Sidebar = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const location = useLocation();
   const [expandedItem, setExpandedItem] = React.useState(null);
+  const userRole = localStorage.getItem('userRole');
+  const navItems = React.useMemo(() => getNavItems(userRole), [userRole]);
 
   const drawerStyle = {
     width: drawerWidth,
@@ -64,10 +99,13 @@ export const Sidebar = () => {
       boxShadow: '0 4px 12px 0 rgba(0,0,0,0.05)',
     },
   };
-  const filteredNavItems = navItems.filter(item => {
-  if (item.label === 'Users' && userRole !== 'SUPER_ADMIN') return false;
-  return true;
-});
+  const filteredNavItems = React.useMemo(() => {
+    return navItems.filter(item => {
+      if (item.label === 'Users' && userRole !== 'SUPER_ADMIN') return false;
+      return true;
+    });
+  }, [navItems, userRole]);
+
   const drawer = (
     <Box sx={{ 
       p: 2,
@@ -86,7 +124,7 @@ export const Sidebar = () => {
           style={{ 
             width: '64px', 
             height: '64px',
-            color: '#1976d2' // primary color
+            color: userRole==='SUPER_ADMIN' ? '#000000' : '#1976d2'
           }} 
         />
       </Box>
@@ -96,10 +134,15 @@ export const Sidebar = () => {
     <React.Fragment key={item.label}>
       <ListItem disablePadding>  
         <ListItemButton
-          component={item.subItems ? 'div' : Link}
-          to={item.subItems ? undefined : item.path}
+          component={item.subItems || item.action==='logout' ? 'div' : Link}
+          to={item.subItems || item.action==='logout' ? undefined : item.path}
           selected={!item.subItems && location.pathname === item.path}
           onClick={() => {
+            if(item.action==='logout'){
+              localStorage.clear();
+              window.location.href='/login';
+              return;
+            }
             if (item.subItems) {
               setExpandedItem(expandedItem === item.label ? null : item.label);
             }

@@ -125,6 +125,10 @@ export const AuthForm = () => {
         const decodedToken = parseJwt(data.token);
         const userRole = decodedToken?.role;
 
+        if (userRole) {
+          localStorage.setItem('userRole', userRole);
+        }
+
         if (!userRole) {
           alert("Impossible de déterminer le rôle utilisateur");
           return;

@@ -4,7 +4,6 @@ import com.example.backend.dto.PlanInventaireDTO;
 import com.example.backend.model.*;
 import com.example.backend.repository.*;
 import com.example.backend.service.PlanInventaireService;
-import com.example.backend.util.ThymeleafPdfGenerator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -127,24 +126,19 @@ public class PlanInventaireController {
                 plan.setZones(zones);
             }
 
-            // Handle products based on plan type
             List<Map<String, Object>> produitsData = (List<Map<String, Object>>) requestData.get("produits");
             
             if (plan.getType() == TYPE.COMPLET) {
-                // For COMPLET, include all products from selected zones
                 for (Zone zone : zones) {
                     produits.addAll(zone.getProduits());
                 }
                 plan.setInclusTousProduits(true);
             } else if (plan.getType() == TYPE.PARTIEL) {
-                // For PARTIEL, only include specifically selected products
                 if (produitsData != null) {
                     for (Map<String, Object> produitData : produitsData) {
                         Long produitId = ((Number) produitData.get("id")).longValue();
                         Produit produit = produitRepository.findById(produitId)
                                 .orElseThrow(() -> new EntityNotFoundException("Produit not found with id: " + produitId));
-                        
-                        // Verify that the product belongs to at least one of the selected zones
                         boolean produitInSelectedZones = zones.stream()
                                 .anyMatch(zone -> zone.getProduits().contains(produit));
                         
@@ -158,11 +152,7 @@ public class PlanInventaireController {
                 plan.setInclusTousProduits(false);
             }
             plan.setProduits(produits);
-
-            // Save the plan
             PlanInventaire savedPlan = planInventaireRepository.save(plan);
-
-            // Return success response with plan id
             Map<String, Object> response = new HashMap<>();
             response.put("id", savedPlan.getId());
             response.put("message", "Plan d'inventaire créé avec succès");
