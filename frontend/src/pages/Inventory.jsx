@@ -193,18 +193,14 @@ const Inventory = () => {
     await axios.put(`http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, {
       justification: justification
     });
-
-
-  
+    
    const checkup = [...manualCheckups, ...scanCheckups].find(c => c.id === selectedCheckupId);
        if (checkup) {
       const produitId = checkup.details?.[0]?.produit?.id;
       
       if (produitId) {
-        //Réinitialiser les quantités pour toutes les zones du produit
         const product = planproducts.find(p => p.id === produitId);
         if (product && product.zones) {
-          // Réinitialiser pour chaque zone où le produit est présent
           for (const zone of product.zones) {
             try {
               await axios.put(`http://localhost:8080/produits/${produitId}/zones/${zone.id}/updateQuantite`, {
@@ -300,7 +296,6 @@ const Inventory = () => {
           toastId: 'validating'
         });
 
-        // Mise à jour de la quantité théorique et du statut
         await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
           quantiteTheorique: Number(manual)||Number(scanned),
         });
@@ -309,7 +304,6 @@ const Inventory = () => {
           toastId: 'quantity-updated'
         });
 
-        // Valider le check seulement si checkupId existe
         if (checkupId) {
           await axios.put(`http://localhost:8080/checkups/${checkupId}/valider`);
           toast.success('Contrôle validé', {
@@ -376,7 +370,6 @@ const Inventory = () => {
         setLoading(false);
       }
     };
-
     initialLoad();
    // const interval = setInterval(silentUpdate, 5000);
     //return () => clearInterval(interval);
@@ -396,7 +389,6 @@ const Inventory = () => {
       ]);
 
       setPlanProducts(prevProducts => {
-        // Ne mettre à jour que si les données ont changé
         const hasChanged = JSON.stringify(prevProducts) !== JSON.stringify(updatedProducts);
         return hasChanged ? updatedProducts : prevProducts;
       });
@@ -441,7 +433,6 @@ const Inventory = () => {
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="flex min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -495,8 +486,7 @@ const Inventory = () => {
         theme="colored"
       />
       
-      {/* Update the main content container */}
-      <div className="flex-1 min-w-0 overflow-x-hidden"> {/* Added these classes */}
+      <div className="flex-1 min-w-0 overflow-x-hidden">
         <div className="p-4 md:p-6">
           <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
             <div className="flex flex-col md:flex-row justify-between items-center mb-6">
