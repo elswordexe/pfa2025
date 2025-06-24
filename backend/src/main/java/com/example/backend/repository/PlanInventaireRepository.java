@@ -37,4 +37,7 @@ public interface PlanInventaireRepository extends JpaRepository<PlanInventaire, 
 
     @Query("SELECT MAX(p.dateCreation) FROM PlanInventaire p JOIN p.produits prod WHERE prod.id = :productId")
     LocalDateTime findLastInventoryDateForProduct(@Param("productId") Long productId);
+
+    // Fetch plans created by a given user id
+    List<PlanInventaire> findByCreateurId(Long userId);
 }

@@ -129,4 +129,9 @@ public class Utilisateur implements UserDetails {
         return datecremod;
     }
 
+    @Override
+    public String getUsername() {
+        return (username != null && !username.isBlank()) ? username : email;
+    }
+
 }

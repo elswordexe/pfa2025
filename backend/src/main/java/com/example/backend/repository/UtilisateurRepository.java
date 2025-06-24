@@ -1,6 +1,5 @@
 package com.example.backend.repository;
 
-import com.example.backend.model.AgentInventaire;
 import com.example.backend.model.Role;
 import com.example.backend.model.Utilisateur;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,4 +12,6 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     List<Utilisateur> findByRole(Role role);
     long countByRole(Role role);
     Optional<Utilisateur> findByResetPasswordToken(String token);
+
+    Optional<Utilisateur> findById(Long createurId);
 }

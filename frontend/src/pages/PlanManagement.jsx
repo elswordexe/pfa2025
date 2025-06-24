@@ -16,6 +16,12 @@ import TextField from '@mui/joy/TextField';
 import Select from '@mui/joy/Select';
 import Option from '@mui/joy/Option';
 import Sidebar from '../components/Sidebar';
+import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
+import Stack from '@mui/joy/Stack';
+import FormControl from '@mui/joy/FormControl';
+import FormLabel from '@mui/joy/FormLabel';
+import Input from '@mui/joy/Input';
 
 export default function PlanManagement() {
   const [plans, setPlans] = useState([]);
@@ -27,11 +33,16 @@ export default function PlanManagement() {
   const [logsModalOpen, setLogsModalOpen] = useState(false);
   const [logs, setLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editPlanData, setEditPlanData] = useState({ nom: '', dateDebut: '', dateFin: '', type: '' });
+
+  const navigate = useNavigate();
 
   const fetchPlans = async () => {
     try {
       const { data } = await axios.get('http://localhost:8080/api/plans');
-      setPlans(data);
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.content) ? data.content : []);
+      setPlans(list);
     } catch (err) {
       console.error('Erreur de chargement des plans', err);
     }
@@ -129,10 +140,22 @@ export default function PlanManagement() {
                 <td>{plan.statut}</td>
                 <td>{plan.type}</td>
                 <td>
-                  <IconButton color="primary" onClick={() => alert(JSON.stringify(plan, null, 2))}>
+                  <IconButton color="primary" onClick={() => {
+                    localStorage.setItem('selectedPlanId', plan.id);
+                    navigate('/inventory');
+                  }}>
                     <VisibilityIcon />
                   </IconButton>
-                  <IconButton color="warning" onClick={() => alert('Fonctionnalité de modification à implémenter') }>
+                  <IconButton color="warning" onClick={() => {
+                    setSelectedPlan(plan);
+                    setEditPlanData({
+                      nom: plan.nom || '',
+                      dateDebut: dayjs(plan.dateDebut).format('YYYY-MM-DDTHH:mm'),
+                      dateFin: dayjs(plan.dateFin).format('YYYY-MM-DDTHH:mm'),
+                      type: plan.type || ''
+                    });
+                    setEditModalOpen(true);
+                  }}>
                     <EditIcon />
                   </IconButton>
                   <IconButton color="danger" onClick={() => handleDelete(plan.id)}>
@@ -216,6 +239,50 @@ export default function PlanManagement() {
           )}
           <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
             <Button onClick={() => setLogsModalOpen(false)}>Fermer</Button>
+          </Box>
+        </ModalDialog>
+      </Modal>
+
+      {/* Edit Plan Modal */}
+      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)}>
+        <ModalDialog sx={{ width: 400 }}>
+          <Typography level="h4" mb={2}>Modifier le plan</Typography>
+          <Stack spacing={2}>
+            <FormControl>
+              <FormLabel>Nom</FormLabel>
+              <Input value={editPlanData.nom} onChange={(e)=>setEditPlanData(prev=>({...prev, nom:e.target.value}))} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Date début</FormLabel>
+              <Input type="datetime-local" value={editPlanData.dateDebut} onChange={(e)=>setEditPlanData(prev=>({...prev, dateDebut:e.target.value}))}/>
+            </FormControl>
+            <FormControl>
+              <FormLabel>Date fin</FormLabel>
+              <Input type="datetime-local" value={editPlanData.dateFin} onChange={(e)=>setEditPlanData(prev=>({...prev, dateFin:e.target.value}))}/>
+            </FormControl>
+            <Select placeholder="Type" value={editPlanData.type} onChange={(e,val)=>setEditPlanData(prev=>({...prev,type:val}))}>
+              <Option value="COMPLET">Complet</Option>
+              <Option value="PARTIEL">Partiel</Option>
+              <Option value="TOURNANT">Tournant</Option>
+            </Select>
+          </Stack>
+          <Box sx={{ display:'flex',justifyContent:'flex-end',gap:1, mt:2 }}>
+            <Button onClick={()=>setEditModalOpen(false)}>Annuler</Button>
+            <Button onClick={async ()=>{
+              try{
+                await axios.put(`http://localhost:8080/api/plans/${selectedPlan.id}`,{
+                  nom:editPlanData.nom,
+                  dateDebut:editPlanData.dateDebut,
+                  dateFin:editPlanData.dateFin,
+                  type:editPlanData.type
+                });
+                setEditModalOpen(false);
+                fetchPlans();
+              }catch(err){
+                console.error('Erreur maj plan',err);
+                alert('Erreur lors de la mise à jour');
+              }
+            }}>Enregistrer</Button>
           </Box>
         </ModalDialog>
       </Modal>

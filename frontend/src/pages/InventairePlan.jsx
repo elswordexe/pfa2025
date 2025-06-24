@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { use, useEffect, useState } from 'react';
 import axios from 'axios';
 import {
   Typography,
@@ -18,16 +18,17 @@ import {
   FormLabel,
   Alert,
   Grid,
-  Box // Add Box import
+  Box 
 } from '@mui/joy';
 import Sidebarsuper from '../components/Sidebar';
 import { SearchRounded as SearchIcon, CloseRounded } from '@mui/icons-material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useNavigate } from 'react-router-dom';
+import { getUserIdFromToken } from '../utils/auth';
 
 const InventairePlan = () => {
   const navigate = useNavigate();
-  // Add error state
+const userId = getUserIdFromToken();
   const [error, setError] = useState(null);
     const [plan, setPlan] = useState({
     nom: '',
@@ -36,7 +37,8 @@ const InventairePlan = () => {
     type: 'COMPLET',
     zones: [],
     produits: [],
-    statut: 'Indefini'
+    statut: 'Indefini',
+    createur: { id: userId },
   });
 
   const [selectedAgents, setSelectedAgents] = useState({});
@@ -53,7 +55,8 @@ const InventairePlan = () => {
 
   const [allProducts, setAllProducts] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
-
+const token = localStorage.getItem('token');
+  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
   useEffect(() => {
     fetchZonesAndAgents();
     fetchProducts();
@@ -62,12 +65,12 @@ const InventairePlan = () => {
   const fetchZonesAndAgents = async () => {
     try {
       const [zonesRes, agentsRes] = await Promise.all([
-        fetch('http://localhost:8080/Zone/all'),
-        fetch('http://localhost:8080/users/agents')
+        axios.get('http://localhost:8080/Zone/all'),
+        axios.get('http://localhost:8080/users/agents')
       ]);
       
-      const zonesData = await zonesRes.json();
-      const agentsData = await agentsRes.json();
+      const zonesData = zonesRes.data;
+      const agentsData = agentsRes.data;
       
       setZones(zonesData);
       setAgents(agentsData);
@@ -93,9 +96,7 @@ const InventairePlan = () => {
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
-  const token = localStorage.getItem('token');
-  const decoded = token ? JSON.parse(atob(token.split('.')[1])) : null;
-  const userId = decoded?.id;
+  const userId = getUserIdFromToken();
   setError(null);
 
   try { 

@@ -32,7 +32,8 @@ public class Produit {
     private Double prix;
     private String unite;
     private LocalDateTime datecremod;
-    private String imageUrl;    private Integer quantitetheo;
+    private String imageUrl;
+    private Integer quantitetheo;
     private String status;
 
     @ManyToOne
@@ -57,5 +58,4 @@ public class Produit {
     @JsonIgnoreProperties({"produit", "zone"})
     private Set<ZoneProduit> zoneProduits = new HashSet<>();
 
-    // Methods omitted for brevity
 }

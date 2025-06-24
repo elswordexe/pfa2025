@@ -167,10 +167,27 @@ public class ZoneController {
             for (ZoneProduitDTO zpDTO : zoneDTO.getZoneProduits()) {
                 Optional<Produit> produitOpt = produitRepository.findById(zpDTO.getProduitId());
                 if (produitOpt.isPresent()) {
+                    Produit produit = produitOpt.get();
+                    Integer requested = zpDTO.getQuantitetheo() == null ? 0 : zpDTO.getQuantitetheo();
+                    Integer totalDisponible = produit.getQuantitetheo();
+                    if (totalDisponible != null) {
+                        // Somme des quantités déjà allouées dans d'autres zones (exclut la zone en cours car elle a été clear())
+                        int dejaAlloue = produit.getZoneProduits().stream()
+                                .filter(zp -> !zp.getZone().getId().equals(id))
+                                .map(ZoneProduit::getQuantiteTheorique)
+                                .filter(q -> q != null)
+                                .mapToInt(Integer::intValue)
+                                .sum();
+                        int restant = totalDisponible - dejaAlloue;
+                        if (requested > restant) {
+                            return ResponseEntity.badRequest().body("La quantité demandée pour le produit " + produit.getNom() + " dépasse la quantité restante disponible (" + restant + ")");
+                        }
+                    }
+
                     ZoneProduit zoneProduit = new ZoneProduit();
                     zoneProduit.setId(new ZoneProduitId(id, zpDTO.getProduitId()));
                     zoneProduit.setZone(existingZone);
-                    zoneProduit.setProduit(produitOpt.get());
+                    zoneProduit.setProduit(produit);
                     zoneProduit.setQuantiteTheorique(zpDTO.getQuantitetheo());
                     existingZone.getZoneProduits().add(zoneProduit);
                 }
@@ -191,9 +208,24 @@ public class ZoneController {
             for (ZoneProduitDTO zpDTO : zoneDTO.getZoneProduits()) {
                 Optional<Produit> produitOpt = produitRepository.findById(zpDTO.getProduitId());
                 if (produitOpt.isPresent()) {
+                    Produit produit = produitOpt.get();
+                    Integer requested = zpDTO.getQuantitetheo() == null ? 0 : zpDTO.getQuantitetheo();
+                    Integer totalDisponible = produit.getQuantitetheo();
+                    if (totalDisponible != null) {
+                        int dejaAlloue = produit.getZoneProduits().stream()
+                                .map(ZoneProduit::getQuantiteTheorique)
+                                .filter(q -> q != null)
+                                .mapToInt(Integer::intValue)
+                                .sum();
+                        int restant = totalDisponible - dejaAlloue;
+                        if (requested > restant) {
+                            return ResponseEntity.badRequest().body("La quantité demandée pour le produit " + produit.getNom() + " dépasse la quantité restante disponible (" + restant + ")");
+                        }
+                    }
+
                     ZoneProduit zoneProduit = new ZoneProduit();
                     zoneProduit.setZone(newZone);
-                    zoneProduit.setProduit(produitOpt.get());
+                    zoneProduit.setProduit(produit);
                     zoneProduit.setQuantiteTheorique(zpDTO.getQuantitetheo());
                     newZone.getZoneProduits().add(zoneProduit);
                 }

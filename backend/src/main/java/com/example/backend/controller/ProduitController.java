@@ -1,19 +1,13 @@
 package com.example.backend.controller;
 import com.example.backend.dto.ProduitDTO;
-import com.example.backend.dto.CategoryDTO;
 import com.example.backend.dto.ProductImportDTO;
-import com.example.backend.dto.SubCategoryDTO;
-import com.example.backend.model.Category;
-import com.example.backend.model.Produit;
-import com.example.backend.model.SubCategory;
-import com.example.backend.model.Zone;
+import com.example.backend.model.*;
 import com.example.backend.repository.CategorieRepository;
 import com.example.backend.repository.ProduitRepository;
 import com.example.backend.repository.SubCategoryRepository;
 import com.example.backend.repository.ZoneRepository;
 import com.example.backend.service.ProduitImageService;
 import com.example.backend.service.ProduitImportService;
-import com.example.backend.service.PdfExportService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,12 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.example.backend.dto.ProduitDTO;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -58,8 +51,7 @@ public class ProduitController {
     }
     @Autowired
     CategorieRepository categoryRepository;
-    @Autowired
-    private PdfExportService pdfExportService;
+
 
     @Operation(summary = "Retourner les infos d'un seul produit")
     @ApiResponses(value = {
@@ -457,21 +449,7 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
         return dto;
     }
 
-    @Operation(summary = "Exporter la liste des produits en PDF")
-    @GetMapping("/export/pdf")
-    public ResponseEntity<byte[]> exportPdf() {
-        try {
-            List<Produit> produits = produitRepository.findAll();
-            byte[] pdfBytes = pdfExportService.generateProduitsPdf(produits);
-
-            return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=produits.pdf")
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdfBytes);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }    @Operation(summary = "Mettre à jour la quantité et le statut d'un produit dans une zone spécifique")
+   @Operation(summary = "Mettre à jour la quantité et le statut d'un produit dans une zone spécifique")
     @ApiResponse(responseCode = "200", description = "Quantité et statut mis à jour avec succès")
     @PutMapping("/{produitId}/zones/{zoneId}/updateQuantite")
     public ResponseEntity<?> updateProduitQuantiteInZone(
@@ -547,16 +525,44 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
                     .body(Map.of("error", "Le produit n'appartient pas à cette zone"));
             }
 
-            // Mise à jour de la quantité et du statut
-            produit.setQuantitetheo(newQuantity);
+            // Rechercher le lien ZoneProduit correspondant
+            ZoneProduit targetZp = null;
+            for (ZoneProduit zp : produit.getZoneProduits()) {
+                if (zp.getZone().getId().equals(zoneId)) {
+                    targetZp = zp;
+                    break;
+                }
+            }
+
+            if (targetZp == null) {
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "ZoneProduit non trouvé pour ce produit et cette zone"));
+            }
+
+            // Mise à jour de la quantité théorique du couple zone-produit
+            targetZp.setQuantiteTheorique(newQuantity);
+
+            // Facultatif : statut du produit global
             if (status != null) {
                 produit.setStatus(status);
             }
+
+            // Recalculer la quantité totale du produit à partir de toutes ses zones
+            int totalQuantite = produit.getZoneProduits().stream()
+                    .map(ZoneProduit::getQuantiteTheorique)
+                    .filter(q -> q != null)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+
+            produit.setQuantitetheo(totalQuantite);
+
+            // Sauvegarder via repository ; CascadeType.ALL assure la persist de ZoneProduit
             produitRepository.save(produit);
 
             return ResponseEntity.ok(Map.of(
                 "message", "Mise à jour réussie",
-                "quantiteTheorique", newQuantity,
+                "quantiteTheoriqueZone", newQuantity,
+                "quantiteTheoriqueProduit", totalQuantite,
                 "status", produit.getStatus()
             ));
 

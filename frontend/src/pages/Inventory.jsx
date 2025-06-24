@@ -5,6 +5,7 @@ import { useTheme, useMediaQuery } from '@mui/material';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import InventoryPDF from '../components/InventoryPDF';
+import { getUserIdFromToken, getRoleFromToken } from '../utils/auth';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -13,7 +14,11 @@ const Inventory = () => {
   const [manualCheckups, setManualCheckups] = useState([]);
   const [scanCheckups, setScanCheckups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [planId, setPlanId] = useState(1);
+  const [planId, setPlanId] = useState(() => {
+    const stored = localStorage.getItem('selectedPlanId');
+    return stored ? Number(stored) : null;
+  });
+  const userId = getUserIdFromToken();
   const [availablePlans, setAvailablePlans] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState('');
@@ -28,28 +33,22 @@ const Inventory = () => {
   const [showPDF, setShowPDF] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [products, setProducts] = useState([]);
-  const[ZoneProducts, setZoneProducts] = useState([]);
-  const[ProdcutStatus, setProductStatus] = useState([]);
-  const [planDetails, setPlanDetails] = useState({});
   const [selectedProduct, setSelectedProduct] = useState(null);
-  // Ref pour savoir si c'est la toute première charge
   const firstLoadRef = useRef(true);
+  const userRole = getRoleFromToken();
 
   useEffect(() => {
     const fetchPlans = async () => {
       try {
-        const token = localStorage.getItem('token'); 
-          const decoded = token ? JSON.parse(atob(token.split('.')[1])) : null;
-    const userId = decoded?.id;
-  const userRole = decoded?.role;
+        const baseUrl = 'http://localhost:8080/api/plans';
+        console.log('Current userId for plan filtering:', userId);
+        const url = userRole !== 'SUPER_ADMIN' && userId ? `${baseUrl}/createdby/${userId}` : baseUrl;
+        const response = await axios.get(url);
+        let plans = Array.isArray(response.data) ? response.data : [response.data];
 
-  const response = await axios.get('http://localhost:8080/api/plans');
-    let plans = Array.isArray(response.data) ? response.data : [response.data];
-
-    if (userRole === 'ADMIN_CLIENT') {
-  plans = plans.filter(plan => plan.createur?.id === userId);
-    }
+        if (userRole !== 'SUPER_ADMIN') {
+          plans = plans.filter(plan => plan.createur?.id === userId);
+        }
 
         setAvailablePlans(prevPlans => {
           const newData = JSON.stringify(plans);
@@ -58,82 +57,58 @@ const Inventory = () => {
         });
       } catch (error) {
         console.error('Error fetching plans:', error);
-        setAvailablePlans([]); // Only if you want to clear it on error
+        setAvailablePlans([]);
         setError('Failed to load plans');
+      } finally {
+        if (firstLoadRef.current) {
+          setLoading(false);
+        }
       }
     };
     fetchPlans();
-    //const interval = setInterval(fetchPlans, 5000);
-   // return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {    const fetchZonesAndPlan = async () => {
+  useEffect(() => {
+    if (planId == null && availablePlans.length > 0) {
+      const firstId = availablePlans[0].id;
+      setPlanId(firstId);
+      localStorage.setItem('selectedPlanId', firstId);
+    }
+  }, [availablePlans, planId]);
+
+  useEffect(() => {
+    if (planId == null) return;
+
+    const fetchZonesAndPlan = async () => {
       if (firstLoadRef.current) {
         setLoading(true);
       }
       try {
-        // 1. Fetch all zones first
         const zonesRes = await axios.get('http://localhost:8080/Zone/all');
         console.log('All zones:', zonesRes.data);
         const allZones = zonesRes.data || [];
 
-        // 2. Fetch plan details
         const planRes = await axios.get(`http://localhost:8080/api/plans/${planId}/details`);
         console.log('Plan details:', planRes.data); 
-        // 3. Fetch zone products avec les quantités théoriques
         const zoneProductsRes = await axios.get(`http://localhost:8080/api/plans/${planId}/zone-products`);
-        
-        // Log détaillé pour debug
-        console.log('Zone products raw response:', zoneProductsRes.data);
-        
-        // Vérifions la structure exacte des données de Zone_Produit
         const firstZone = Object.keys(zoneProductsRes.data || {})[0];
         const firstProduct = zoneProductsRes.data[firstZone]?.[0];
-        
-        console.log('Structure détaillée:', {
-          firstZoneId: firstZone,
-          firstProductInZone: firstProduct,
-          quantityFields: firstProduct ? {
-            quantite: firstProduct.quantite,
-            quantite_theorique: firstProduct.quantite_theorique,
-            quantitetheo: firstProduct.quantitetheo,
-            quantiteTheorique: firstProduct.quantiteTheorique,
-            Zone_Produit: firstProduct.Zone_Produit
-          } : null
-        });
-        console.log('API Response - Plan Data:', planRes.data);
-        console.log('API Response - Zone Products:', zoneProductsRes.data);
-        
-        const planData = planRes.data || { zones: [] };
+
         const zones = allZones;
         const zoneProducts = zoneProductsRes.data || {};
-
-        console.log('Zones récupérées:', zones);
     
-
         const productsWithZones = Object.entries(zoneProducts).reduce((acc, [zoneId, products = []]) => {
           products.forEach(product => {            const existingProduct = acc.find(p => p.id === product.id);
             const zoneObj = zones.find(z => z.id === Number(zoneId));
             
             const zoneWithProducts = zones.find(z => z.id === Number(zoneId));
             
-            // Chercher la quantité théorique dans zoneProduits
             const zoneProduit = zoneWithProducts?.zoneProduits?.find(zp => 
               zp.id.produitId === product.id && zp.id.zoneId === Number(zoneId)
-            );
-            
+            ); 
             const quantiteTheo = zoneProduit?.quantiteTheorique || 
                                product.quantiteTheorique ||
                                0;
-            
-            console.log('Quantité extraite pour produit:', {
-              productId: product.id,
-              zoneId: zoneId,
-              zoneWithProducts,
-              zoneProduit,
-              quantiteTheo,
-              fullProduct: product
-            });
 
             if (existingProduct) {
               existingProduct.zones.push(zoneObj);
@@ -152,28 +127,13 @@ const Inventory = () => {
           return acc;
         }, []);
 
-        console.log('Produits avec leurs zones:', productsWithZones);
-        productsWithZones.forEach(product => {
-          console.log('Product zones details:', {
-            productId: product.id,
-            productName: product.nom,
-            zones: product.zones.map(z => ({
-              id: z?.id,
-              nom: z?.nom,
-              name: z?.name
-            }))
-          });
-        });
-
         setPlanProducts(productsWithZones);
         setZones(zones);
 
-        // 3. Fetch checkups
         const [manualRes, scanRes] = await Promise.all([
           axios.get(`http://localhost:8080/checkups/plan/${planId}/type/MANUEL`),
           axios.get(`http://localhost:8080/checkups/plan/${planId}/type/SCAN`)
         ]);
-
         setManualCheckups(manualRes.data || []);
         setScanCheckups(scanRes.data || []);
       } catch (error) {
@@ -188,8 +148,6 @@ const Inventory = () => {
     };
 
     fetchZonesAndPlan();
-    //const interval = setInterval(fetchZonesAndPlan, 5000); // fetch every 5s
-    //return () => clearInterval(interval);
   }, [planId]);
 
   const refreshCheckups = async () => {
@@ -240,11 +198,10 @@ const Inventory = () => {
   
    const checkup = [...manualCheckups, ...scanCheckups].find(c => c.id === selectedCheckupId);
        if (checkup) {
-      // Extraire produitId depuis les détails du checkup
       const produitId = checkup.details?.[0]?.produit?.id;
       
       if (produitId) {
-        // 3. Réinitialiser les quantités pour toutes les zones du produit
+        //Réinitialiser les quantités pour toutes les zones du produit
         const product = planproducts.find(p => p.id === produitId);
         if (product && product.zones) {
           // Réinitialiser pour chaque zone où le produit est présent
@@ -321,7 +278,6 @@ const Inventory = () => {
           toastId: 'quantity-updated'
         });
 
-        // Valider le check seulement si checkupId existe
         if (checkupId) {
           await axios.put(`http://localhost:8080/checkups/${checkupId}/valider`);
           toast.success('Contrôle validé', {
@@ -329,7 +285,6 @@ const Inventory = () => {
           });
         }
 
-        // Supprimer le produit du plan côté backend puis côté state
         await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`);
 
         setPlanProducts(prev => prev.filter(p => p.id !== produitId));
@@ -362,8 +317,6 @@ const Inventory = () => {
             toastId: 'checkup-validated'
           });
         }
-
-        // Supprimer le produit du plan côté backend puis côté state
         await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`);
 
         setPlanProducts(prev => prev.filter(p => p.id !== produitId));
@@ -374,7 +327,6 @@ const Inventory = () => {
       }
     }
   };
-
   const getQuantityColor = (scannedQty, manualQty, theoreticalQty) => {
     const scanned = Number(scannedQty);
     const manual = Number(manualQty);
@@ -588,8 +540,12 @@ const Inventory = () => {
                   <label className="text-sm font-medium text-gray-700 mb-1">Plan d'inventaire</label>
                   <div className="relative">
                     <select
-                      value={planId}
-                      onChange={(e) => setPlanId(Number(e.target.value))}
+                      value={planId ?? ''}
+                      onChange={(e) => {
+                        const id = Number(e.target.value);
+                        setPlanId(id);
+                        localStorage.setItem('selectedPlanId', id);
+                      }}
                       className="w-full md:w-64 pl-10 pr-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                     >
                       {Array.isArray(availablePlans) && availablePlans.length > 0 ? (
@@ -682,7 +638,7 @@ const Inventory = () => {
             {activeTab === 'products' ? (
               <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
                 <table className="w-full">
-                  <thead className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white">                    <tr>
+                  <thead className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white"><tr>
                       <th className="p-4 text-left">Produit</th>
                       <th className="p-4 text-left">Référence</th>
                       <th className="p-4 text-left">Zone</th>

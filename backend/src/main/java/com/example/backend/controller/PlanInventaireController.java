@@ -17,6 +17,7 @@ import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -110,6 +111,15 @@ public class PlanInventaireController {
             String statutStr = (String) requestData.get("statut");
             plan.setStatut(statutStr != null ? STATUS.valueOf(statutStr) : STATUS.Indefini);
             plan.setDateCreation(LocalDateTime.now());
+            Map<String, Object> createurMap = (Map<String, Object>) requestData.get("createur");
+            if (createurMap != null) {
+                Long createurId = ((Number) createurMap.get("id")).longValue();
+                Utilisateur createur = utilisateurRepository.findById(createurId)
+                        .orElseThrow(() -> new EntityNotFoundException("Utilisateur introuvable avec l'id: " + createurId));
+                plan.setCreateur(createur);
+            } else {
+                throw new IllegalArgumentException("Champ 'createur' manquant dans la requête");
+            }
 
             // Handle zones
             List<Map<String, Object>> zonesData = (List<Map<String, Object>>) requestData.get("zones");
@@ -593,7 +603,6 @@ private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
         });
     }
 
-    // Map Createur with null check
     if (plan.getCreateur() != null) {
         PlanInventaireDTO.UtilisateurDTO createurDTO = new PlanInventaireDTO.UtilisateurDTO();
         createurDTO.setId(plan.getCreateur().getId());
@@ -658,7 +667,7 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
                     produitMap.put("nom", produit.getNom());
                     produitMap.put("codeBarre", produit.getCodeBarre());
                     // Ne pas inclure la quantité si elle n'est pas disponible dans le modèle
-                    produitMap.put("quantitetheo", 0); // Valeur par défaut, à ajuster selon votre modèle
+                    produitMap.put("quantitetheo", 0);
                     produits.add(produitMap);
                 }
                 
@@ -676,6 +685,12 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
     @AllArgsConstructor
     private static class ErrorResponse {
         private final String error;
+    }
+
+    @GetMapping("/createdby/{userId}")
+    public ResponseEntity<List<PlanInventaire>> getPlansByCreateur(@PathVariable Long userId) {
+        List<PlanInventaire> plans = planInventaireRepository.findByCreateurId(userId);
+        return ResponseEntity.ok(plans);
     }
 
 

@@ -3,20 +3,15 @@ package com.example.backend.controller;
 
 import com.example.backend.model.Ecart;
 import com.example.backend.model.PlanInventaire;
-import com.example.backend.model.Zone;
-import com.example.backend.model.ZoneProduit;
 import com.example.backend.repository.EcartRepository;
 import com.example.backend.repository.PlanInventaireRepository;
 import com.example.backend.service.EcartService;
-import com.example.backend.service.PdfExportService;
 import com.example.backend.util.ExportUtil;
-import com.itextpdf.text.DocumentException;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.thymeleaf.context.Context;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,9 +30,6 @@ public class EcartController {
 
     @Autowired
     private EcartService ecartService;
-    
-    @Autowired
-    private PdfExportService pdfExportService;
 
     @PostMapping("/generate/{planId}")
     public ResponseEntity<?> generateEcarts(@PathVariable Long planId) {

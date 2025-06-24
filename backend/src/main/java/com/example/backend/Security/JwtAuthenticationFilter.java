@@ -67,10 +67,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         authorities.add(new SimpleGrantedAuthority(role));
                     }
 
+                    // Combine authorities from the userDetails and those extracted from the token
+                    List<GrantedAuthority> combinedAuthorities = new ArrayList<>(userDetails.getAuthorities());
+                    for (GrantedAuthority ga : authorities) {
+                        if (!combinedAuthorities.contains(ga)) {
+                            combinedAuthorities.add(ga);
+                        }
+                    }
+
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                             userDetails,
                             null,
-                            userDetails.getAuthorities()
+                            combinedAuthorities
                     );
 
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

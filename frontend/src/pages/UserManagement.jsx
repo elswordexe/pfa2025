@@ -72,7 +72,6 @@ export default function UserManagement() {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: '#fff5f5' }}>
-      <addProduit />
       <Sidebarsuper />
       <Box sx={{ flex: 1, p: 4 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>

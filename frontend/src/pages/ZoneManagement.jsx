@@ -9,6 +9,7 @@ import {
   FormControl,
   FormLabel,
   Alert,
+  Textarea
 } from '@mui/joy';
 import { Edit, Delete, Add, LocationOn } from '@mui/icons-material';
 
@@ -25,6 +26,10 @@ const ZoneManagement = () => {
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [productQuantities, setProductQuantities] = useState([]);
   const [zoneProducts, setZoneProducts] = useState([]);
+  const [remainingQty, setRemainingQty] = useState({});
+
+  const token = localStorage.getItem('token');
+  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
 
   const fetchZones = async () => {
     try {
@@ -52,7 +57,10 @@ const ZoneManagement = () => {
 
   const fetchZoneProducts = async (zoneId) => {
     try {
-      const response = await fetch(`http://localhost:8080/Zones/${zoneId}/products`);
+      const response = await fetch(`http://localhost:8080/Zones/${zoneId}/products`, {
+        method: 'GET',
+        headers: authHeaders
+      });
       if (!response.ok) throw new Error('Failed to fetch zone products');
       const data = await response.json();
       setZoneProducts(data);
@@ -86,6 +94,7 @@ const ZoneManagement = () => {
         method: editingZone ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...authHeaders
         },
         body: JSON.stringify(zoneData),
       });
@@ -113,6 +122,7 @@ const ZoneManagement = () => {
     try {
       const response = await fetch(`http://localhost:8080/Zones/${zoneId}`, {
         method: 'DELETE',
+        headers: authHeaders
       });
 
       if (!response.ok) throw new Error('Failed to delete zone');
@@ -132,24 +142,50 @@ const ZoneManagement = () => {
     setModalOpen(true);
   };
 
-  const handleManageProducts = async (zone) => {
-    setSelectedZone(zone);
-    try {
-      await fetchZoneProducts(zone.id);
-      setSelectedProducts(zoneProducts);
-      // Initialize quantities
-      const quantities = {};
-      zoneProducts.forEach(product => {
-        quantities[product.id] = product.quantitetheo || 0;
+const handleManageProducts = async (zone) => {
+  setSelectedZone(zone);
+  setError(null);
+  setProductQuantities({});
+  setSelectedProducts([]);
+  setRemainingQty({});
+  setZoneProducts([]);
+  
+  const quantities = {};
+  zone.zoneProduits?.forEach(zp => {
+    const prodId = zp.id.produitId;
+    quantities[prodId] = zp.quantiteTheorique || 0;
+  });
+  setProductQuantities(quantities);
+
+  // Produits sélectionnés pour cette zone
+  const selected = availableProducts.filter(prod =>
+    zone.zoneProduits?.some(zp => zp.id.produitId === prod.id)
+  );
+  setSelectedProducts(selected);
+
+  // Recalculer le stock disponible par produit (quantité totale - autres zones)
+  const remaining = {};
+  availableProducts.forEach(prod => {
+    const total = prod.quantitetheo || 0;
+    let allocatedElsewhere = 0;
+
+    zones.forEach(z => {
+      if (z.id === zone.id) return; // skip current zone
+      z.zoneProduits?.forEach(zp => {
+        if (zp.id.produitId === prod.id) {
+          allocatedElsewhere += zp.quantiteTheorique || 0;
+        }
       });
-      setProductQuantities(quantities);
-      setProductsModalOpen(true);
-      await fetchAvailableProducts();
-    } catch (error) {
-      console.error('Error managing products:', error);
-      setError(error.message);
-    }
-  };
+    });
+
+    remaining[prod.id] = total - allocatedElsewhere;
+  });
+  setRemainingQty(remaining);
+
+  setProductsModalOpen(true);
+};
+
+
 
   const handleToggleProduct = (product) => {
     setSelectedProducts(prev => {
@@ -163,44 +199,79 @@ const ZoneManagement = () => {
   };
 
   const handleSaveProducts = async () => {
-    setLoading(true);
-    try {
-      // Create request body matching ZoneDTO structure
-      const zoneData = {
-        id: selectedZone.id,
-        name: selectedZone.name,
-        description: selectedZone.description,
-        zoneProduits: selectedProducts.map(product => ({
-          produitId: product.id,
-          quantitetheo: productQuantities[product.id] || 0
-        }))
-      };
+  setLoading(true);
+  try {
+    const zoneData = {
+      id: selectedZone.id,
+      name: selectedZone.name,
+      description: selectedZone.description,
+      zoneProduits: selectedProducts.map(product => ({
+        produitId: product.id,
+        quantitetheo: productQuantities[product.id] || 0,
+      })),
+    };
 
-      const response = await fetch(`http://localhost:8080/Zone/update/${selectedZone.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(zoneData),
-      });
+    const response = await fetch(`http://localhost:8080/Zone/update/${selectedZone.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify(zoneData),
+    });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Failed to save zone products: ${errorData}`);
-      }
-      
-      await Promise.all([
-        fetchZones(),
-        fetchZoneProducts(selectedZone.id)
-      ]);
-      setProductsModalOpen(false);
-    } catch (error) {
-      console.error('Error saving zone products:', error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
+    if (!response.ok) {
+      const errorData = await response.text();
+      throw new Error(`Failed to save zone products: ${errorData}`);
     }
-  };
+
+    const updatedZoneProducts = await fetchZoneProducts(selectedZone.id);
+    setZoneProducts(updatedZoneProducts);
+
+    await fetchZones();
+    const updatedQuantities = {};
+updatedZoneProducts.forEach(prod => {
+  updatedQuantities[prod.id] = prod.quantitetheo || 0;
+});
+setProductQuantities(updatedQuantities);
+
+const newRemaining = computeRemaining(updatedQuantities, selectedZone.id);
+setRemainingQty(newRemaining);
+    setProductsModalOpen(false);
+  } catch (error) {
+    console.error('Error saving zone products:', error);
+    setError(error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const computeRemaining = (currentQuantities, zoneId) => {
+  const rem = {};
+  availableProducts.forEach(prod => {
+    const total = prod.quantitetheo || 0;
+    let allocated = 0;
+
+    zones.forEach(z => {
+      // Si autre zone => somme normale
+      if (z.id !== zoneId) {
+        z.zoneProduits?.forEach(zp => {
+          if (zp.id.produitId === prod.id) {
+            allocated += zp.quantiteTheorique || 0;
+          }
+        });
+      } else {
+        // Pour la zone actuelle : utiliser `currentQuantities`
+        allocated += currentQuantities[prod.id] || 0;
+      }
+    });
+
+    rem[prod.id] = Math.max(total - allocated, 0);
+  });
+
+  return rem;
+};
+
 
   return (
        <div className="flex min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -301,10 +372,9 @@ const ZoneManagement = () => {
 
                 <FormControl>
                   <FormLabel>Description</FormLabel>
-                  <Input
+                  <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    multiline
                     minRows={3}
                   />
                 </FormControl>
@@ -349,6 +419,7 @@ const ZoneManagement = () => {
                       <th className="px-4 py-2 text-left">Produit</th>
                       <th className="px-4 py-2 text-left">Catégorie</th>
                       <th className="px-4 py-2 text-left">Quantité</th>
+                      <th className="px-4 py-2 text-left">Disponible</th>
                       <th className="px-4 py-2 text-center">Actions</th>
                     </tr>
                   </thead>
@@ -361,17 +432,31 @@ const ZoneManagement = () => {
                         <tr key={product.id} className="border-t">
                           <td className="px-4 py-2">{product.nom}</td>
                           <td className="px-4 py-2">{product.category?.name}</td>
-                          <td className="px-4 py-2">
-                            <Input
-                              type="number"
-                              value={productQuantities[product.id] || (zoneProduct?.quantitetheo || 0)}
-                              onChange={(e) => setProductQuantities({
-                                ...productQuantities,
-                                [product.id]: parseInt(e.target.value) || 0
-                              })}
-                              min="0"
-                              className="w-24"
-                            />
+                         <td className="px-4 py-2">
+ <Input
+  type="number"
+  value={productQuantities[product.id] ?? 0}
+  onChange={(e) => {
+    const newQty = parseInt(e.target.value) || 0;
+
+    const oldQty = productQuantities[product.id] ?? 0;
+    const maxAllowed = (remainingQty[product.id] ?? 0) + oldQty;
+    const cappedQty = Math.min(newQty, maxAllowed);
+
+    const newQuantities = {
+      ...productQuantities,
+      [product.id]: cappedQty,
+    };
+    setProductQuantities(newQuantities);
+    setRemainingQty(computeRemaining(newQuantities, selectedZone.id));
+  }}
+  min="0"
+  className="w-24"
+/>
+
+</td>
+                          <td className="px-4 py-2 text-gray-500">
+                            {remainingQty[product.id] ?? '-'}
                           </td>
                           <td className="px-4 py-2 text-center">
                             <Button

@@ -27,7 +27,6 @@ public class JacksonConfig {
         mapper.setDefaultPropertyInclusion(
             JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL)
         );
-        
         return mapper;
     }
 }

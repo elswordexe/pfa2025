@@ -16,6 +16,7 @@ import ClientManagement from './pages/ClientManagement';
 import PlanManagement from './pages/PlanManagement';
 import Dashboardsuperadmin from './components/DashSuper';
 import { useEffect } from 'react';
+import { getRoleFromToken } from './utils/auth';
 
 function Logout() {
   useEffect(() => {
@@ -26,6 +27,8 @@ function Logout() {
 }
 
 function App() {
+  const role = getRoleFromToken();
+
   return (
     <Router>
       <Routes>
@@ -33,7 +36,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/dashboard" element={<Dash />} />
         <Route path="/users" element={<UserManagement />} />
-        <Route path="/plans" element={localStorage.getItem('userRole') === 'SUPER_ADMIN' ? <PlanManagement /> : <InventairePlan />} />
+        <Route path="/plans" element={role === 'SUPER_ADMIN' ? <PlanManagement /> : <InventairePlan />} />
         <Route path="/inventory" element={<Inventorytest />} />
         <Route path="/verify" element={<VerifyAccount />} />
         <Route path="/reset-password" element={<ResetPassword />} />
@@ -43,7 +46,6 @@ function App() {
         <Route path="/login" element={<AuthForm mode="login" />} />
         <Route path="/register" element={<AuthForm mode="register" />} />
         <Route path="/zones" element={<ZoneManagement />} />
-        <Route path="/clients" element={<ClientManagement />} />
         <Route path="/plans-management" element={<PlanManagement />} />
         <Route path="/logout" element={<Logout />} />
       </Routes>

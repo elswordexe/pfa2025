@@ -45,7 +45,6 @@ const getNavItems = (role) => {
         { label: 'Plans Management', icon: <MapIcon />, path: '/plans-management' },
         commonProducts,
         { label: 'Zones', icon: <LocationPinIcon />, path: '/zones' },
-        { label: 'Clients', icon: <PeopleIcon />, path: '/clients' },
         { label: 'Users', icon: <PeopleIcon />, path: '/users' },
         { label: 'Logout', icon: <LogoutIcon />, action: 'logout' },
       ];

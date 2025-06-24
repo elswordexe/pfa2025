@@ -30,6 +30,7 @@ import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 import { Add } from '@mui/icons-material';
 import ProductListPDF from '../components/ProductListPDF';
+import axios from 'axios';
 
 const ListeProduits = () => {
   const [products, setProducts] = useState([]);
@@ -45,25 +46,16 @@ const ListeProduits = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [editError, setEditError] = useState(null);
 const [showPDF, setShowPDF] = useState(false);
-  // Add new state for validated products
   const [validatedProducts, setValidatedProducts] = useState(new Set());
-
-  // Add new state for plan status
   const [planStatus, setPlanStatus] = useState('');
-
-  // First add planId to your state declarations at the top
-  const [planId, setPlanId] = useState(1); // Add this with your other state declarations
-
-  // Add to existing state declarations
+  const [planId, setPlanId] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Fetch categories
+  const token = localStorage.getItem('token');
+  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await fetch('http://localhost:8080/api/categories');
-        if (!response.ok) throw new Error('Failed to fetch categories');
-        const data = await response.json();
+        const { data } = await axios.get('http://localhost:8080/api/categories');
         setCategories(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Error fetching categories:', error);
@@ -71,15 +63,12 @@ const [showPDF, setShowPDF] = useState(false);
     };
     fetchCategories();
   }, []);
-
-  // Check and update plan status
   const checkAndUpdatePlanStatus = async (planId) => {
     try {
       const response = await fetch(`http://localhost:8080/produits/plan/${planId}`);
       const products = await response.json();
       
       if (products.length === 0) {
-        // Update plan status to "TERMINE"
         await fetch(`http://localhost:8080/api/plans/${planId}`, {
           method: 'PUT',
           headers: {
@@ -93,15 +82,11 @@ const [showPDF, setShowPDF] = useState(false);
       console.error('Error checking plan status:', error);
     }
   };
-
-  // Fetch products with filters
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         let url = 'http://localhost:8080/produits';
-        
-        // Add query parameters for filtering
         const params = new URLSearchParams();
         if (selectedCategory) params.append('categoryId', selectedCategory);
         if (selectedSubCategory) params.append('subCategoryId', selectedSubCategory);
@@ -111,12 +96,9 @@ const [showPDF, setShowPDF] = useState(false);
         if (!response.ok) throw new Error('Failed to fetch products');
         const data = await response.json();
         setProducts(Array.isArray(data) ? data : []);
-        
-        // Check if there are no more products
         if (data.length === 0) {
           await checkAndUpdatePlanStatus(planId);
         }
-        
         setError(null);
       } catch (err) {
         console.error('Error:', err);
@@ -144,16 +126,13 @@ const [showPDF, setShowPDF] = useState(false);
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await fetch(`http://localhost:8080/produits/${productToDelete.id}`, {
+      const response = await axios.delete(`http://localhost:8080/produits/${productToDelete.id}`, {
         method: 'DELETE',
+        headers: authHeaders
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Erreur lors de la suppression');
-      }
+      if (!response.ok) throw new Error('Failed to delete Product');
 
-      // Remove product from local state
       setProducts(products.filter(p => p.id !== productToDelete.id));
       setDeleteModalOpen(false);
       setProductToDelete(null);
@@ -165,7 +144,7 @@ const [showPDF, setShowPDF] = useState(false);
   };
 
   const handleEditClick = (product) => {
-    setEditingProduct({ ...product }); // Create a copy to avoid direct state mutation
+    setEditingProduct({ ...product });
     setEditModalOpen(true);
     setEditError(null);
   };
@@ -195,7 +174,6 @@ const [showPDF, setShowPDF] = useState(false);
 
       const updatedProduct = await response.json();
       
-      // Update products list with the modified product
       setProducts(products.map(p => 
         p.id === updatedProduct.id ? updatedProduct : p
       ));
@@ -216,11 +194,11 @@ const [showPDF, setShowPDF] = useState(false);
     const theoreticalQty = Number(product.quantitetheo);
 
     if (validatedProducts.has(product.id)) {
-      return 'success.100'; // Green background for validated products
+      return 'success.100'; 
     } else if (manualQty === scannedQty) {
-      return 'success.50'; // Light green for matching quantities
+      return 'success.50'; 
     }
-    return 'background.surface'; // Default background
+    return 'background.surface'; 
   };
 
   const handleValider = async (product) => {
@@ -229,7 +207,6 @@ const [showPDF, setShowPDF] = useState(false);
       const scannedQty = Number(product.scannedQuantity);
 
       if (manualQty === scannedQty) {
-        // Update theoretical quantity to match
         await fetch(`http://localhost:8080/produits/${product.id}/updateQuantite`, {
           method: 'PUT',
           headers: {
@@ -240,15 +217,12 @@ const [showPDF, setShowPDF] = useState(false);
           })
         });
 
-        // Mark product as validated
         await fetch(`http://localhost:8080/checkups/${product.checkupId}/valider`, {
           method: 'PUT'
         });
 
-        // Update local state
         setValidatedProducts(prev => new Set([...prev, product.id]));
         
-        // Remove product from list after a short delay to show green color
         setTimeout(() => {
           setProducts(prevProducts => 
             prevProducts.filter(p => p.id !== product.id)
@@ -268,7 +242,6 @@ const [showPDF, setShowPDF] = useState(false);
         <div className="flex-1 overflow-hidden">
           <div className="p-4 md:p-6">
             <div className="bg-white rounded-2xl shadow-xl">
-              {/* Header */}
               <div className="p-6 border-b border-gray-200">
                 <div className="flex flex-col md:flex-row justify-between items-center">
                   <div>
@@ -330,7 +303,6 @@ const [showPDF, setShowPDF] = useState(false);
                 </div>
               </div>
 
-              {/* Filters */}
               <div className="p-4 bg-blue-50 border-b border-blue-100">
                 <div className="flex flex-col md:flex-row gap-4">
                   <FormControl className="md:w-64">

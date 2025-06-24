@@ -30,11 +30,7 @@ const AjouterProduit = () => {
     const fetchCategories = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:8080/api/categories');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
+        const { data } = await axios.get('http://localhost:8080/api/categories');
         
         // Validate the data structure
         if (!Array.isArray(data)) {
@@ -77,11 +73,7 @@ const AjouterProduit = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8080/api/categories/${categorieId}/sous-categories`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch sub-categories');
-      }
-      const data = await response.json();
+      const { data } = await axios.get(`http://localhost:8080/api/categories/${categorieId}/sous-categories`);
       setSousCategories(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching sub-categories:', error);
@@ -93,14 +85,8 @@ const AjouterProduit = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8080/produits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(product)
-      });
-      if (response.ok) {
+      const { status } = await axios.post('http://localhost:8080/produits', product);
+      if (status === 200 || status === 201) {
         alert('Produit ajouté avec succès');
         setProduct({
           nom: '',

@@ -45,11 +45,14 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/produits","/api/plans/**","produits/byZone/*","Zone/all","api/plans/names-dates","produits/names-dates","produits","users/countAdminClient","api/plans/countByStatus","users/names-dates","api/plans/countterminer","produits/count","Zone/count","/users/login","users/countAgentInventaire", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/produits","/api/plans","/api/plans/**","produits/byZone/*","Zone/all","api/plans/names-dates","produits/names-dates","produits","users/countAdminClient","api/plans/countByStatus","users/names-dates","api/plans/countterminer","produits/count","Zone/count","/users/login","users/countAgentInventaire", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        //produit management
+                        .requestMatchers(HttpMethod.PUT,"/produits/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.DELETE,"/produits/{produitId}").hasAnyAuthority("SUPER_ADMIN", "ROLE_SUPER_ADMIN", "ADMIN_CLIENT", "ROLE_ADMIN_CLIENT")
                         //checkup management
                         .requestMatchers(HttpMethod.POST,"/checkups/ajouter","/checkups/scan").hasAnyAuthority("AGENT_INVENTAIRE")
                         .requestMatchers(HttpMethod.PUT,"/checkups/{checkupId}/recomptage","/checkups/{checkupId}/valider").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                        .requestMatchers(HttpMethod.GET,"/checkups/plan/{id}","/checkups/plan/{planId}/logs","/checkupsplan/{planId}/type/{type}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.GET,"/checkups/plan/{id}","/checkups/plan/{planId}/logs","/checkups/plan/{planId}/type/{type}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         // User management
                         .requestMatchers(HttpMethod.GET ,"/users","users/count","users/countAdminClient").hasAnyAuthority("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.GET ,"/users/agents","AgentInventaire","users/countAgentInventaire","users/names-dates").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
@@ -64,22 +67,23 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/clients/**").hasAnyAuthority("SUPER_ADMIN")
                         //Categ
-                        .requestMatchers(HttpMethod.GET, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.GET, "/api/categories", "/api/categories/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         .requestMatchers(HttpMethod.POST, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.PUT, "/api/categories/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
                         //plans
                         .requestMatchers(HttpMethod.GET,"api/plans","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                        .requestMatchers(HttpMethod.GET, "api/plans/{planId}/produits","api/plans/{planId}/details","api/plans/{planId}/zone-products").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                        .requestMatchers(HttpMethod.POST, "api/plans","api/plans/{planId}/zones","api/plans/{planId}/produits","{planId}/produits/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.GET, "/api/plans/{planId}/produits","/api/plans/{planId}/details","/api/plans/{planId}/zone-products","/api/plans/createdby/{userId}","/api/plans/createdby/me").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/plans","/api/plans/{planId}/zones","/api/plans/{planId}/produits","/api/plans/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.PUT, "api/plans/{planId}/statut","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         // Zone manage
-                        .requestMatchers(HttpMethod.GET, "Zone/all","Zones/{zoneId}/products","Zone/count").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
-                        .requestMatchers(HttpMethod.POST, "Zone","Zones/{zoneId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.GET, "/Zone/all","/Zones/{zoneId}/products","/Zone/count").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.POST, "/Zone","/Zones/{zoneId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.PUT, "/Zone/update/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                        .requestMatchers(HttpMethod.DELETE, "Zones/{zoneId}","Zones/{zoneId}/products/{productId}").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.DELETE, "/Zones/{zoneId}","/Zones/{zoneId}/products/{productId}").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
                         //lkhrin authaut
                         .anyRequest().authenticated()
+
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
