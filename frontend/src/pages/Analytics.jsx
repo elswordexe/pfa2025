@@ -57,7 +57,6 @@ const Analytics = () => {
     let data = {
       planStats: [],
       historicalData: [],
-      // Keep other stats relatively stable
       zoneStats: mockData.zoneStats,
       ecartStats: mockData.ecartStats,
       productStats: mockData.productStats,
@@ -82,7 +81,6 @@ const Analytics = () => {
         break;
 
       case 'month':
-        // Generate last 30 days data
         for (let i = 29; i >= 0; i--) {
           const date = new Date(today);
           date.setDate(date.getDate() - i);
@@ -99,7 +97,6 @@ const Analytics = () => {
         break;
 
       case 'quarter':
-        // Generate last 3 months data by weeks
         for (let i = 11; i >= 0; i--) {
           const date = new Date(today);
           date.setDate(date.getDate() - (i * 7));
@@ -116,7 +113,6 @@ const Analytics = () => {
         break;
 
       case 'year':
-        // Use existing monthly data
         data.planStats = mockData.planStats;
         data.historicalData = mockData.historicalData;
         break;
@@ -157,8 +153,8 @@ const Analytics = () => {
 
   const renderEcartsChart = () => {
     const ECART_COLORS = {
-      surplus: '#4CAF50',  // Bright green
-      manquants: '#FF5252' // Bright red
+      surplus: '#4CAF50',
+      manquants: '#FF5252'
     };
 
     return (
@@ -263,7 +259,6 @@ const Analytics = () => {
         </Box>
 
         <Grid container spacing={3}>
-          {/* Écarts par Type */}
           <Grid xs={12} md={6}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
@@ -272,8 +267,6 @@ const Analytics = () => {
               {renderEcartsChart()}
             </Card>
           </Grid>
-
-          {/* Performance par Zone */}
           <Grid xs={12} md={6}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
@@ -282,8 +275,6 @@ const Analytics = () => {
               {renderZonePerformance()}
             </Card>
           </Grid>
-
-          {/* Tendances Historiques */}
           <Grid xs={12}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
@@ -300,8 +291,6 @@ const Analytics = () => {
               </ResponsiveContainer>
             </Card>
           </Grid>
-
-          {/* Tableau Détaillé */}
           <Grid xs={12}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
