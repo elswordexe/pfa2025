@@ -298,15 +298,15 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
         return ResponseEntity.ok(Map.of("message", "Déconnexion réussie"));
     }
     @Operation(summary = "Obtenir les noms et dates de modification des utilisateurs")
-@ApiResponses(value = {
+    @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Liste récupérée avec succès"),
         @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la récupération des données")
-})
-@GetMapping("users/names-dates")
-public ResponseEntity<List<Map<String, Object>>> getUsersNameAndDate(
+    })
+    @GetMapping("users/names-dates")
+    public ResponseEntity<List<Map<String, Object>>> getUsersNameAndDate(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
-    try {
+        try {
         Pageable pageable = PageRequest.of(page, size);
         Page<Utilisateur> userPage = utilisateurRepository.findAll(pageable);
         
@@ -321,16 +321,27 @@ public ResponseEntity<List<Map<String, Object>>> getUsersNameAndDate(
                 .collect(Collectors.toList());
                 
         return ResponseEntity.ok(usersData);
-    } catch (Exception e) {
+        } catch (Exception e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(List.of());
+        }
     }
-}
-@DeleteMapping("users/{id}")
-public ResponseEntity<?> deleteUser(@PathVariable Long id) {
-    utilisateurRepository.deleteById(id);
+    @Operation(summary = "Delete a User")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Deletion cmplete"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la suppression ")
+    })
+    @DeleteMapping("users/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        utilisateurRepository.deleteById(id);
     return ResponseEntity.ok(Map.of("message", "Utilisateur supprimé"));
-}
+    }
+
+    @Operation(summary = "Modification d'Utilisateur")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Modification avec succès"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la modification des données")
+    })
     @PutMapping("users/{id}")
     public ResponseEntity<?> modifyUser(@PathVariable Long id, @RequestBody Utilisateur userDetails) {
         return utilisateurRepository.findById(id).map(user -> {
@@ -408,12 +419,12 @@ public ResponseEntity<?> deleteUser(@PathVariable Long id) {
     }
 
 
-@GetMapping("/users/agents")
-@Operation(summary = "Récupérer tous les agents d'inventaire")
-@ApiResponses(value = {
-    @ApiResponse(responseCode = "200", description = "Liste des agents récupérée avec succès")
-})
-public ResponseEntity<List<Map<String, Object>>> getAllAgents() {
+    @GetMapping("/users/agents")
+    @Operation(summary = "Récupérer tous les agents d'inventaire")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Liste des agents récupérée avec succès")
+    })
+    public ResponseEntity<List<Map<String, Object>>> getAllAgents() {
     List<Utilisateur> agents = utilisateurRepository.findByRole(Role.AGENT_INVENTAIRE);
     
     List<Map<String, Object>> agentsData = agents.stream()
@@ -428,5 +439,5 @@ public ResponseEntity<List<Map<String, Object>>> getAllAgents() {
         .collect(Collectors.toList());
     
     return ResponseEntity.ok(agentsData);
-}
+    }
 }
