@@ -246,6 +246,11 @@ public List<Produit> getProduitsByZone(@PathVariable Long id) {
     Optional<Zone> zone = zoneRepository.findById(id);
     return zone.map(Zone::getProduits).orElse(List.of());
 }
+    @Operation(summary = "insertion d' images des produits")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "insértion avec succès"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur lors de l'insertion d'images")
+    })
     @PostMapping("/{produitId}/image")
     public ResponseEntity<?> uploadProductImage(
             @PathVariable("produitId") Long produitId,
@@ -256,7 +261,11 @@ public List<Produit> getProduitsByZone(@PathVariable Long id) {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(response);
     }
-
+    @Operation(summary = "Obtenir les images des produits")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "récupération avec succès"),
+            @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la récupération des données")
+    })
     @GetMapping("/{produitId}/image")
     public ResponseEntity<?> getProductImage(@PathVariable("produitId") Long produitId) {
         byte[] image = produitImageService.getProductImage(produitId);
@@ -305,7 +314,11 @@ public ResponseEntity<List<Map<String, Object>>> getProduitsNameAndDate(
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(List.of());
     }
-}
+} @Operation(summary = "importer les donnes des produits sous format Excel")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "importé avec succès"),
+            @ApiResponse(responseCode = "404", description = "importation échoué")
+    })
 @PostMapping("/import/excel")
 public ResponseEntity<?> importFromExcel(@RequestParam("file") MultipartFile file) {
     try {
@@ -325,7 +338,11 @@ public ResponseEntity<?> importFromExcel(@RequestParam("file") MultipartFile fil
             .body(Map.of("message", "Erreur lors de l'import: " + e.getMessage()));
     }
 }
-
+    @Operation(summary = "importer les donnes des produits sous format CSV")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "importé avec succès"),
+            @ApiResponse(responseCode = "404", description = "importation échoué")
+    })
 @PostMapping("/import/csv")
 public ResponseEntity<?> importFromCsv(@RequestParam("file") MultipartFile file) {
     try {
@@ -346,6 +363,11 @@ public ResponseEntity<?> importFromCsv(@RequestParam("file") MultipartFile file)
     }
 }
 
+    @Operation(summary = "importer les donnes des produits sous format JSON")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "importé avec succès"),
+            @ApiResponse(responseCode = "404", description = "importation échoué")
+    })
 @PostMapping("/import/json")
 public ResponseEntity<?> importProducts(@RequestBody List<ProductImportDTO> productsDTO) {
     try {
@@ -360,8 +382,7 @@ public ResponseEntity<?> importProducts(@RequestBody List<ProductImportDTO> prod
             produit.setPrix(dto.getPrix());
             produit.setUnite(dto.getUnite());
             produit.setQuantitetheo(dto.getQuantitetheo());
-            
-            // Handle category
+
             if (dto.getCategory() != null) {
                 Category category = categoryRepository.findByName(dto.getCategory().getName())
                     .orElseGet(() -> {
@@ -371,8 +392,6 @@ public ResponseEntity<?> importProducts(@RequestBody List<ProductImportDTO> prod
                     });
                 produit.setCategory(category);
             }
-            
-            // Handle subcategory
             if (dto.getSubCategory() != null) {
                 SubCategory subCategory = subCategoryRepository.findByName(dto.getSubCategory().getName())
                     .orElseGet(() -> {
@@ -393,6 +412,12 @@ public ResponseEntity<?> importProducts(@RequestBody List<ProductImportDTO> prod
             .body("Error importing products: " + e.getMessage());
     }
 }
+
+    @Operation(summary = "Retourner toutes les  produit")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Produits listés"),
+            @ApiResponse(responseCode = "404", description = "erreur aucun produit")
+    })
 @GetMapping
 public ResponseEntity<List<ProduitDTO>> getAllProduits(
     @RequestParam(required = false) Long categoryId,
@@ -457,7 +482,6 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
             @PathVariable Long zoneId,
             @RequestBody Map<String, Object> requestBody) {
         try {
-            // Gérer la conversion de la quantité de manière plus robuste
             Integer newQuantity = null;
             Object quantityObj = requestBody.get("quantiteTheorique");
             if (quantityObj != null) {
@@ -474,8 +498,7 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
                     }
                 }
             }
-            
-            String status = requestBody.get("status") != null ? String.valueOf(requestBody.get("status")) : null;            // Log détaillé des données reçues pour debug
+            String status = requestBody.get("status") != null ? String.valueOf(requestBody.get("status")) : null;
             System.out.println("Received request body: " + requestBody);
             System.out.println("Request body type: " + (requestBody.get("quantiteTheorique") != null ? requestBody.get("quantiteTheorique").getClass().getName() : "null"));
             System.out.println("Converted quantity: " + newQuantity);
@@ -533,21 +556,12 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
                     break;
                 }
             }
-
             if (targetZp == null) {
                 return ResponseEntity.badRequest()
                     .body(Map.of("error", "ZoneProduit non trouvé pour ce produit et cette zone"));
             }
-
-            // Mise à jour de la quantité théorique du couple zone-produit
             targetZp.setQuantiteTheorique(newQuantity);
 
-            // Facultatif : statut du produit global
-            if (status != null) {
-                produit.setStatus(status);
-            }
-
-            // Recalculer la quantité totale du produit à partir de toutes ses zones
             int totalQuantite = produit.getZoneProduits().stream()
                     .map(ZoneProduit::getQuantiteTheorique)
                     .filter(q -> q != null)
@@ -556,14 +570,12 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
 
             produit.setQuantitetheo(totalQuantite);
 
-            // Sauvegarder via repository ; CascadeType.ALL assure la persist de ZoneProduit
             produitRepository.save(produit);
 
             return ResponseEntity.ok(Map.of(
                 "message", "Mise à jour réussie",
                 "quantiteTheoriqueZone", newQuantity,
-                "quantiteTheoriqueProduit", totalQuantite,
-                "status", produit.getStatus()
+                "quantiteTheoriqueProduit", totalQuantite
             ));
 
         } catch (Exception e) {

@@ -107,16 +107,12 @@ public class ZoneController {
                 dto.setDatecremod(produit.getDatecremod());
                 dto.setImageUrl(produit.getImageUrl());
                 dto.setQuantitetheo(produit.getQuantitetheo());
-                
-                // Map category
                 if (produit.getCategory() != null) {
                     ProduitDTO.CategoryDTO categoryDTO = new ProduitDTO.CategoryDTO();
                     categoryDTO.setId(produit.getCategory().getId());
                     categoryDTO.setName(produit.getCategory().getName());
                     dto.setCategory(categoryDTO);
                 }
-                
-                // Map subcategory
                 if (produit.getSubCategory() != null) {
                     ProduitDTO.SubCategoryDTO subCategoryDTO = new ProduitDTO.SubCategoryDTO();
                     subCategoryDTO.setId(produit.getSubCategory().getId());
@@ -171,7 +167,6 @@ public class ZoneController {
                     Integer requested = zpDTO.getQuantitetheo() == null ? 0 : zpDTO.getQuantitetheo();
                     Integer totalDisponible = produit.getQuantitetheo();
                     if (totalDisponible != null) {
-                        // Somme des quantités déjà allouées dans d'autres zones (exclut la zone en cours car elle a été clear())
                         int dejaAlloue = produit.getZoneProduits().stream()
                                 .filter(zp -> !zp.getZone().getId().equals(id))
                                 .map(ZoneProduit::getQuantiteTheorique)

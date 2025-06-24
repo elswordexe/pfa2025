@@ -75,7 +75,6 @@ public class EcartService {
 
     @Transactional
     public Ecart createEcart(Ecart ecart) {
-        // Recalculate difference
         int theoreticalQty = ecart.getProduit().getQuantitetheo();
         ecart.setEcartQuantite(ecart.getQuantiteComptee() - theoreticalQty);
         ecart.setDateCreation(LocalDateTime.now());
@@ -94,7 +93,6 @@ public class EcartService {
         ecart.setJustification(justification);
         ecart.setDateValidation(LocalDateTime.now());
 
-        // Update product quantity if validated
         if (ecart.getStatut() == EcartStatut.VALIDE) {
             var produit = ecart.getProduit();
             produit.setQuantitetheo(ecart.getQuantiteComptee());

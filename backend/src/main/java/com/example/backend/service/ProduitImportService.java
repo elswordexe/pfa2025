@@ -122,8 +122,7 @@ public class ProduitImportService {
                             return categoryRepository.save(newCategory);
                         });
                 });
-                
-                // Handle subcategory if present
+
                 if (produit.getSubCategory() != null && produit.getSubCategory().getName() != null) {
                     String subCategoryName = produit.getSubCategory().getName();
                     String cacheKey = categoryName + ":" + subCategoryName;

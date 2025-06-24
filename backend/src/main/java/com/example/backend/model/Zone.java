@@ -38,5 +38,4 @@ public class Zone {
     @JsonIgnoreProperties({"zone", "produit"})
     private Set<ZoneProduit> zoneProduits = new HashSet<>();
 
-    // methods omitted for brevity
 }

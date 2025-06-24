@@ -407,38 +407,6 @@ public ResponseEntity<?> deleteUser(@PathVariable Long id) {
         }
     }
 
-    @GetMapping("/users/debug/tokens")
-public ResponseEntity<?> debugTokens() {
-    long tokenCount = tokenRepository.countTokens();
-    List<EmailVerificationToken> tokens = tokenRepository.findAllTokens();
-    
-    Map<String, Object> debug = new HashMap<>();
-    debug.put("tokenCount", tokenCount);
-    debug.put("tokens", tokens.stream().map(t -> Map.of(
-        "id", t.getId(),
-        "token", t.getToken(),
-        "expiration", t.getExpiration(),
-        "userEmail", t.getUtilisateur().getEmail()
-    )).collect(Collectors.toList()));
-    
-    return ResponseEntity.ok(debug);
-}
-@GetMapping("/users/check-status")
-public ResponseEntity<?> checkUserStatus(@RequestParam String email) {
-    try {
-        Utilisateur user = utilisateurRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-            
-        return ResponseEntity.ok()
-            .body(Map.of(
-                "enabled", user.isEnabled(),
-                "email", user.getEmail()
-            ));
-    } catch (Exception e) {
-        return ResponseEntity.badRequest()
-            .body(Map.of("message", e.getMessage()));
-    }
-}
 
 @GetMapping("/users/agents")
 @Operation(summary = "Récupérer tous les agents d'inventaire")

@@ -16,7 +16,6 @@ public class ProduitDTO {
     private String imageUrl;
     private Integer quantitetheo;
     private SubCategoryDTO subCategoryDTO;
-
     private CategoryDTO category;
     private SubCategoryDTO subCategory;
 

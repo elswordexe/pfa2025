@@ -34,7 +34,6 @@ public class Produit {
     private LocalDateTime datecremod;
     private String imageUrl;
     private Integer quantitetheo;
-    private String status;
 
     @ManyToOne
     @JoinColumn(name = "category_id")

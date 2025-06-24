@@ -302,8 +302,7 @@ const Inventory = () => {
 
         // Mise à jour de la quantité théorique et du statut
         await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
-          quantiteTheorique: Number(manual),
-          status: 'VERIFIE'
+          quantiteTheorique: Number(manual)||Number(scanned),
         });
         
         toast.success('Quantité théorique mise à jour', {

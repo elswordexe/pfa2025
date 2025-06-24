@@ -42,8 +42,7 @@ public class DashboardController {
     @GetMapping("/stocks/by-category")
     public ResponseEntity<List<Map<String, Object>>> getStockByCategory() {
         List<Produit> allProducts = produitRepository.findAll();
-        
-        // Group products by category and count
+
         Map<String, Integer> categoryCounts = new HashMap<>();
         
         for (Produit produit : allProducts) {
@@ -52,8 +51,7 @@ public class DashboardController {
                 categoryCounts.put(categoryName, categoryCounts.getOrDefault(categoryName, 0) + 1);
             }
         }
-        
-        // Convert to format expected by frontend
+
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map.Entry<String, Integer> entry : categoryCounts.entrySet()) {
             Map<String, Object> item = new HashMap<>();
