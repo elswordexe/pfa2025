@@ -16,7 +16,7 @@ import ClientManagement from './pages/ClientManagement';
 import PlanManagement from './pages/PlanManagement';
 import Dashboardsuperadmin from './components/DashSuper';
 import { useEffect } from 'react';
-import { getRoleFromToken } from './utils/auth';
+import { getRoleFromToken, isTokenExpired } from './utils/auth';
 
 function Logout() {
   useEffect(() => {
@@ -28,6 +28,20 @@ function Logout() {
 
 function App() {
   const role = getRoleFromToken();
+
+  useEffect(() => {
+    const checkToken = () => {
+      if (isTokenExpired()) {
+        localStorage.removeItem('token');
+        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          window.location.href = '/login';
+        }
+      }
+    };
+    checkToken();
+    const intervalId = setInterval(checkToken, 60000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   return (
     <Router>
