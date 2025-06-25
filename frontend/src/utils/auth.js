@@ -26,4 +26,14 @@ export const getUserIdFromToken = () => {
   const token = localStorage.getItem('token');
   const decoded = parseJwt(token);
   return decoded?.id || null;
+};
+
+export const isTokenExpired = () => {
+  const token = localStorage.getItem('token');
+  if (!token) return true;
+  const decoded = parseJwt(token);
+  if (!decoded || !decoded.exp) return true;
+  // exp est en secondes
+  const isExpired = decoded.exp * 1000 < Date.now();
+  return isExpired;
 }; 

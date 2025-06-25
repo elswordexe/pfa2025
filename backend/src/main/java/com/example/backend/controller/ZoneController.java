@@ -12,6 +12,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 
 import java.util.List;
 import java.util.Optional;
@@ -34,15 +38,28 @@ public class ZoneController {
     @Autowired
     private ProduitRepository produitRepository;
     @Operation(summary = "Lister les zones")
-    @ApiResponses(value =
-            @ApiResponse(responseCode = "200", description = "liste de zones")
-    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "liste de zones",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = Zone.class))))
+    })
     @GetMapping("Zone/all")
     public Iterable<Zone> getAllZones(){
         return zoneRepository.findAll();
     }
-    @Operation(summary = "ajouter des produits aux zones")
-    @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "ajouter avec succes"),@ApiResponse(responseCode = "400", description = "erreur")}
+    @Operation(
+            summary = "ajouter des produits aux zones",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Liste d'IDs de produits à associer à la zone",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Long.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple d'IDs de produits",
+                                    value = "[1, 2, 3]"
+                            )
+                    )
+            )
     )
     @PostMapping("Zones/{zoneId}")
     @Transactional
@@ -83,8 +100,11 @@ public class ZoneController {
         return ResponseEntity.ok().build();
     }
     @Operation(summary = "lister les produits d une zone spécifique ")
-    @ApiResponses(value ={@ApiResponse(responseCode = "200", description = "lister avec succe"),@ApiResponse(responseCode = "400", description = "erreur")}
-    )
+    @ApiResponses(value ={
+            @ApiResponse(responseCode = "200", description = "lister avec succes",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProduitDTO.class)))),
+            @ApiResponse(responseCode = "400", description = "erreur")
+    })
     @GetMapping("Zones/{zoneId}/products")
     public ResponseEntity<?> getZoneProducts(@PathVariable Long zoneId) {
         Optional<Zone> zoneOpt = zoneRepository.findById(zoneId);
@@ -149,6 +169,21 @@ public class ZoneController {
         return zoneRepository.count();
     }
     @PutMapping("/Zone/update/{id}")
+    @Operation(
+            summary = "Mettre à jour une zone",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Données de la zone à mettre à jour",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ZoneDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple de zone",
+                                    value = "{\n  \"name\": \"Zone A\",\n  \"description\": \"Zone de stockage principale\",\n  \"zoneProduits\": [ { \"produitId\": 1, \"quantitetheo\": 100 } ]\n}"
+                            )
+                    )
+            )
+    )
     public ResponseEntity<?> updateZone(@PathVariable Long id, @RequestBody ZoneDTO zoneDTO) {
         Optional<Zone> existingZoneOpt = zoneRepository.findById(id);
         if (existingZoneOpt.isEmpty()) {
@@ -194,6 +229,25 @@ public class ZoneController {
     }
 
     @PostMapping("Zone")
+    @Operation(
+            summary = "Créer une zone",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Données de la zone à créer",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ZoneDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple de création de zone",
+                                    value = "{\n  \"name\": \"Zone B\",\n  \"description\": \"Zone réfrigérée\",\n  \"zoneProduits\": []\n}"
+                            )
+                    )
+            )
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Zone créée",
+                    content = @Content(schema = @Schema(implementation = Zone.class)))
+    })
     public ResponseEntity<?> createZone(@RequestBody ZoneDTO zoneDTO) {
         Zone newZone = new Zone();
         newZone.setName(zoneDTO.getName());

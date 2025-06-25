@@ -7,7 +7,9 @@ import com.example.backend.repository.*;
 import com.example.backend.service.CheckupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.persistence.EntityNotFoundException;
@@ -42,13 +44,24 @@ public class CheckupController {
 
     @Operation(
             summary = "Ajouter un nouveau checkup",
-            description = "Crée un nouveau checkup (manuel ou scan) à partir des données fournies dans le corps de la requête."
+            description = "Crée un nouveau checkup (manuel ou scan) à partir des données fournies dans le corps de la requête.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    description = "Données du checkup à créer",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = CheckupDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple de checkup manuel",
+                                    value = "{\n  \"planId\": 1,\n  \"agentId\": 2,\n  \"type\": \"MANUEL\",\n  \"details\": [ { \"produitId\": 10, \"manualQuantity\": 5 } ]\n}"
+                            )
+                    )
+            )
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Checkup créé avec succès",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckupDTO.class))),
-            @ApiResponse(responseCode = "500", description = "Erreur interne du serveur",
-                    content = @Content(mediaType = "text/plain"))
+                    content = @Content(schema = @Schema(implementation = CheckupDTO.class))),
+            @ApiResponse(responseCode = "500", description = "Erreur interne du serveur")
     })
     @PostMapping("/ajouter")
     public ResponseEntity<?> addCheckup(@RequestBody CheckupDTO checkupDTO) {
@@ -69,7 +82,7 @@ public class CheckupController {
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste des checkups récupérée avec succès",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = Checkup.class))),
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = Checkup.class)))),
             @ApiResponse(responseCode = "500", description = "Erreur interne du serveur")
     })
     @GetMapping("/plan/{planId}/type/{type}")
@@ -86,7 +99,7 @@ public class CheckupController {
 
     @Operation(
             summary = "Scanner un produit",
-            description = "Permet à un agent de scanner un produit (via son code-barres) et de l’ajouter au checkup d’un plan donné."
+            description = "Permet à un agent de scanner un produit (via son code-barres) et de l'ajouter au checkup d'un plan donné."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Produit scanné et ajouté avec succès"),
@@ -147,7 +160,18 @@ public class CheckupController {
 
     @Operation(
             summary = "Demander un recomptage",
-            description = "Permet à un agent de demander un recomptage pour un checkup donné, en fournissant une justification obligatoire. Les quantités scannées et manuelles sont réinitialisées."
+            description = "Permet à un agent de demander un recomptage pour un checkup donné, en fournissant une justification obligatoire. Les quantités scannées et manuelles sont réinitialisées.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    description = "Justification du recomptage",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Exemple de demande de recomptage",
+                                    value = "{\n  \"justification\": \"Erreur de comptage initial\",\n  \"demandeRecomptage\": true\n}"
+                            )
+                    )
+            )
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Recomptage demandé avec succès"),
@@ -198,7 +222,8 @@ public class CheckupController {
             description = "Retourne tous les checkups (SCAN et MANUEL) associés à un plan spécifique, avec leurs informations principales."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Liste des checkups retournée avec succès"),
+            @ApiResponse(responseCode = "200", description = "Liste des checkups retournée avec succès",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = CheckupDTO.class)))),
             @ApiResponse(responseCode = "500", description = "Erreur interne du serveur")
     })
     @GetMapping("/plan/{planId}/logs")

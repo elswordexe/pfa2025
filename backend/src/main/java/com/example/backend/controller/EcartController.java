@@ -40,54 +40,5 @@ public class EcartController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur : " + e.getMessage());
         }
     }
-
-
-    @PutMapping("/{ecartId}/valider")
-    public ResponseEntity<?> validerEcart(@PathVariable Long ecartId) {
-        try {
-            Ecart ecart = ecartRepository.findById(ecartId)
-                .orElseThrow(() -> new RuntimeException("Écart non trouvé"));
-            ecartRepository.save(ecart);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur lors de la validation");
-        }
-    }
-
-    @PutMapping("/{ecartId}/recomptage")
-    public ResponseEntity<?> demanderRecomptage(@PathVariable Long ecartId) {
-        try {
-            Ecart ecart = ecartRepository.findById(ecartId)
-                .orElseThrow(() -> new RuntimeException("Écart non trouvé"));
-            ecart.setDemandeRecomptage(true);
-            ecartRepository.save(ecart);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur lors de la demande de recomptage");
-        }
-    }
-
-
-    @GetMapping("/export/xlsx")
-    public void exportEcartsExcel(
-            @RequestParam Long planId,
-            HttpServletResponse response) throws IOException {
-        try {
-            PlanInventaire plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan non trouvé"));
-            List<Ecart> ecarts = ecartRepository.findByPlanInventaireId(planId);
-
-            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-            response.setHeader("Content-Disposition", 
-                "attachment; filename=ecarts_" + plan.getNom() + ".xlsx");
-
-            ExportUtil.EcartExcelExportUtils excelExporter = 
-                new ExportUtil.EcartExcelExportUtils(ecarts, plan);
-            excelExporter.exportDataToExcel(response);
-        } catch (Exception e) {
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
-                "Erreur lors de l'export Excel: " + e.getMessage());
-        }
-    }
 }
 

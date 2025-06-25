@@ -10,9 +10,14 @@ import com.example.backend.service.ProduitImageService;
 import com.example.backend.service.ProduitImportService;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.SchemaProperty;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -52,10 +57,10 @@ public class ProduitController {
     @Autowired
     CategorieRepository categoryRepository;
 
-
     @Operation(summary = "Retourner les infos d'un seul produit")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Produit listé avec succès"),
+            @ApiResponse(responseCode = "200", description = "Produit listé avec succès",
+                    content = @Content(schema = @Schema(implementation = ProduitDTO.class))),
             @ApiResponse(responseCode = "404", description = "Produit non trouvé")
     })
     @GetMapping("/{id}")
@@ -71,9 +76,24 @@ public class ProduitController {
         }
     }
 
-    @Operation(summary = "Ajout d'un nouveau produit")
+    @Operation(
+            summary = "Ajout d'un nouveau produit",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Produit à ajouter",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Produit.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple d'ajout de produit",
+                                    value = "{\n  \"nom\": \"Chaise\",\n  \"prix\": 99.99,\n  \"unite\": \"piece\",\n  \"description\": \"Chaise ergonomique\",\n  \"reference\": \"CH-12345\",\n  \"CodeBarre\": \"1234567890123\",\n  \"imageUrl\": \"https://example.com/chaise.jpg\",\n  \"category\": { \"id\": 1 },\n  \"zones\": [ { \"id\": 1 }, { \"id\": 2 } ]\n}"
+                            )
+                    )
+            )
+    )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Produit ajouté avec succès"),
+            @ApiResponse(responseCode = "200", description = "Produit ajouté avec succès",
+                    content = @Content(schema = @Schema(implementation = Produit.class))),
             @ApiResponse(responseCode = "400", description = "Données invalides")
     })
     @PostMapping("/register")
@@ -96,8 +116,6 @@ public class ProduitController {
             if (requestMap.containsKey("reference")) produit.setReference((String) requestMap.get("reference"));
             if (requestMap.containsKey("CodeBarre")) produit.setCodeBarre((String) requestMap.get("CodeBarre"));
             if (requestMap.containsKey("imageUrl")) produit.setImageUrl((String) requestMap.get("imageUrl"));
-
-
             if (requestMap.containsKey("category") && requestMap.get("category") != null) {
                 Map<String, Object> categoryMap = (Map<String, Object>) requestMap.get("category");
                 if (categoryMap.containsKey("id")) {
@@ -108,9 +126,7 @@ public class ProduitController {
             }
             produit.setZones(new ArrayList<>());
             Produit savedProduit = produitRepository.save(produit);
-
             List<Long> zoneIds = new ArrayList<>();
-
             if (requestMap.containsKey("zone") && requestMap.get("zone") != null) {
                 Map<String, Object> zoneMap = (Map<String, Object>) requestMap.get("zone");
                 if (zoneMap.containsKey("id")) {
@@ -147,9 +163,7 @@ public class ProduitController {
                 }
             }
             savedProduit = produitRepository.save(savedProduit);
-
             return ResponseEntity.ok(savedProduit);
-
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("Erreur lors de l'ajout du produit: " + e.getMessage());
@@ -170,7 +184,21 @@ public class ProduitController {
         return ResponseEntity.ok().build();
     }
 
-    @Operation(summary = "Mettre à jour un produit")
+    @Operation(
+            summary = "Mettre à jour un produit",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Données du produit à mettre à jour",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Produit.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple de mise à jour de produit",
+                                    value = "{\n  \"nom\": \"Chaise Deluxe\",\n  \"prix\": 129.99,\n  \"unite\": \"piece\",\n  \"description\": \"Chaise ergonomique améliorée\",\n  \"reference\": \"CH-12345\",\n  \"CodeBarre\": \"1234567890123\",\n  \"imageUrl\": \"https://example.com/chaise_deluxe.jpg\",\n  \"category\": { \"id\": 1 },\n  \"zones\": [ { \"id\": 3 } ]\n}"
+                            )
+                    )
+            )
+    )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Produit mis à jour avec succès"),
             @ApiResponse(responseCode = "404", description = "Produit non trouvé")
@@ -187,7 +215,8 @@ public class ProduitController {
 
     @Operation(summary = "Rechercher des produits")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Résultats de recherche"),
+            @ApiResponse(responseCode = "200", description = "Résultats de recherche",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = Produit.class))))
     })
     @GetMapping("/search")
     public ResponseEntity<List<Produit>> searchProducts(
@@ -195,9 +224,7 @@ public class ProduitController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) Double minPrice,
             @RequestParam(required = false) Double maxPrice) {
-
         List<Produit> results;
-
         if (keyword != null && !keyword.trim().isEmpty()) {
             results = produitRepository.findByNomContainingOrDescriptionContainingOrCodeBarreContainingOrReferenceContaining(
                     keyword, keyword, keyword, keyword);
@@ -214,7 +241,6 @@ public class ProduitController {
                     .filter(p -> p.getPrix() >= minPriceValue && p.getPrix() <= maxPriceValue)
                     .toList();
         }
-
         return ResponseEntity.ok(results);
     }
 
@@ -240,12 +266,12 @@ public class ProduitController {
        return  produitRepository.count();
     }
     @Operation(summary = "Obtenir des produits par zone")
-@ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Liste des produits par zone"), })
-@GetMapping("/byZone/{id}")
-public List<Produit> getProduitsByZone(@PathVariable Long id) {
+    @ApiResponses(value = { @ApiResponse(responseCode = "200", description = "Liste des produits par zone"), })
+    @GetMapping("/byZone/{id}")
+    public List<Produit> getProduitsByZone(@PathVariable Long id) {
     Optional<Zone> zone = zoneRepository.findById(id);
     return zone.map(Zone::getProduits).orElse(List.of());
-}
+    }
     @Operation(summary = "insertion d' images des produits")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "insértion avec succès"),
@@ -274,13 +300,13 @@ public List<Produit> getProduitsByZone(@PathVariable Long id) {
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(image);
     }
-@Operation(summary = "Obtenir les noms, dates et images des produits")
-@ApiResponses(value = {
+    @Operation(summary = "Obtenir les noms, dates et images des produits")
+    @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Liste récupérée avec succès"),
         @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la récupération des données")
-})
-@GetMapping("/names-dates")
-public ResponseEntity<List<Map<String, Object>>> getProduitsNameAndDate(
+    })
+    @GetMapping("/names-dates")
+    public ResponseEntity<List<Map<String, Object>>> getProduitsNameAndDate(
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "20") int size) {
     try {
@@ -363,11 +389,21 @@ public ResponseEntity<?> importFromCsv(@RequestParam("file") MultipartFile file)
     }
 }
 
-    @Operation(summary = "importer les donnes des produits sous format JSON")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "importé avec succès"),
-            @ApiResponse(responseCode = "404", description = "importation échoué")
-    })
+    @Operation(
+            summary = "importer les donnes des produits sous format JSON",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Liste des produits à importer",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ProductImportDTO.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple d'import JSON",
+                                    value = "[{\n  \"nom\": \"Table\",\n  \"prix\": 149.99,\n  \"unite\": \"piece\",\n  \"description\": \"Table en bois\",\n  \"reference\": \"TB-001\",\n  \"codeBarre\": \"9876543210987\",\n  \"quantitetheo\": 100,\n  \"category\": { \"name\": \"Mobilier\" },\n  \"subCategory\": { \"name\": \"Tables\" }\n}]"
+                            )
+                    )
+            )
+    )
 @PostMapping("/import/json")
 public ResponseEntity<?> importProducts(@RequestBody List<ProductImportDTO> productsDTO) {
     try {
@@ -415,7 +451,8 @@ public ResponseEntity<?> importProducts(@RequestBody List<ProductImportDTO> prod
 
     @Operation(summary = "Retourner toutes les  produit")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Produits listés"),
+            @ApiResponse(responseCode = "200", description = "Produits listés",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = ProduitDTO.class)))),
             @ApiResponse(responseCode = "404", description = "erreur aucun produit")
     })
 @GetMapping
@@ -474,7 +511,20 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
         return dto;
     }
 
-   @Operation(summary = "Mettre à jour la quantité et le statut d'un produit dans une zone spécifique")
+   @Operation(
+           summary = "Mettre à jour la quantité et le statut d'un produit dans une zone spécifique",
+           requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                   description = "Quantité théorique et statut du produit",
+                   required = true,
+                   content = @Content(
+                           mediaType = "application/json",
+                           examples = @ExampleObject(
+                                   name = "Exemple de mise à jour quantité/statut",
+                                   value = "{\n  \"quantiteTheorique\": 50,\n  \"status\": \"EN_STOCK\"\n}"
+                           )
+                   )
+           )
+   )
     @ApiResponse(responseCode = "200", description = "Quantité et statut mis à jour avec succès")
     @PutMapping("/{produitId}/zones/{zoneId}/updateQuantite")
     public ResponseEntity<?> updateProduitQuantiteInZone(

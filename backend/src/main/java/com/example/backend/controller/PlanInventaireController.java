@@ -17,6 +17,7 @@ import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.responses.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,6 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 
 @RestController
 @RequestMapping("/api/plans")
@@ -91,15 +93,28 @@ public class PlanInventaireController {
             .orElse(ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "Créer un plan d'inventaire", description = "Créer un nouveau plan avec nom, dates, statut, zones, produits et type")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "Plan créé avec succès"),
-        @ApiResponse(responseCode = "400", description = "Données invalides")
-    })
+    @Operation(
+            summary = "Créer un plan d'inventaire",
+            description = "Créer un nouveau plan avec nom, dates, statut, zones, produits et type",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    description = "Corps de la requête pour créer un plan",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Exemple de création de plan",
+                                    value = "{\n  \"nom\": \"Inventaire trimestriel\",\n  \"dateDebut\": \"2025-01-01T08:00:00\",\n  \"dateFin\": \"2025-01-10T18:00:00\",\n  \"type\": \"COMPLET\",\n  \"recurrence\": \"MENSUEL\",\n  \"statut\": \"Planifie\",\n  \"createur\": { \"id\": 1 },\n  \"zones\": [ { \"id\": 1 }, { \"id\": 2 } ]\n}"
+                            )
+                    )
+            ),
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "Plan d'inventaire créé",
+                            content = @Content(schema = @Schema(implementation = Map.class)))
+            }
+    )
     @PostMapping
     public ResponseEntity<Map<String, Object>> createPlan(@RequestBody Map<String, Object> requestData) {
         try {
-            // Create plan and set basic properties
             PlanInventaire plan = new PlanInventaire();
             plan.setNom((String) requestData.get("nom"));
             plan.setDateDebut(LocalDateTime.parse((String) requestData.get("dateDebut")));
@@ -120,8 +135,6 @@ public class PlanInventaireController {
             } else {
                 throw new IllegalArgumentException("Champ 'createur' manquant dans la requête");
             }
-
-            // Handle zones
             List<Map<String, Object>> zonesData = (List<Map<String, Object>>) requestData.get("zones");
             Set<Zone> zones = new HashSet<>();
             Set<Produit> produits = new HashSet<>();
@@ -190,7 +203,6 @@ public class PlanInventaireController {
         planInventaireRepository.deleteById(planId);
         return ResponseEntity.ok().build();
     }
-
     @Operation(summary = "mise a jour du plan", description = "update du plan")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "mise a jour du plan avec succès"),
@@ -204,7 +216,6 @@ public class PlanInventaireController {
         PlanInventaire plan = planInventaireRepository.save(planInventaire);
         return ResponseEntity.ok(plan);
     }
-
     @Operation(summary = "Enregistrer un nouvel utilisateur", description = "Crée un nouveau compte utilisateur")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Utilisateur enregistré avec succès"),
@@ -252,7 +263,6 @@ public class PlanInventaireController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-
     @Operation(summary = "lister les assignation d un plan")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "lister avec succes"),
@@ -275,11 +285,24 @@ public class PlanInventaireController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "ajouter les zones aux plans")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "ajouter des zones avec succès"),
-            @ApiResponse(responseCode = "400", description = "erreur")
-    })
+    @Operation(
+            summary = "Ajouter les zones aux plans",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    description = "Liste d'objets Zone à associer au plan",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = Zone.class),
+                            examples = @ExampleObject(
+                                    name = "Exemple de zones",
+                                    value = "[ { \"id\": 1 }, { \"id\": 2 } ]"
+                            )
+                    )
+            ),responses= {
+        @ApiResponse(responseCode = "200", description = "Zones ajoutées",
+                content = @Content(schema = @Schema(implementation = PlanInventaire.class)))
+    }
+    )
     @PostMapping("{planId}/zones")
     public ResponseEntity<?> addZonesToPlan(@PathVariable Long planId, @RequestBody List<Zone> zones) {
         try {
@@ -294,7 +317,6 @@ public class PlanInventaireController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
-
     @Operation(summary = "Compter le nombre de plan terminer")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Nombre de plan terminer")
@@ -329,7 +351,6 @@ public class PlanInventaireController {
         counts.put("Indéfini", (int) planInventaireRepository.countByStatut(STATUS.Indefini));
         return ResponseEntity.ok(counts);
     }
-
     @Operation(summary = "Obtenir les noms et dates de modification des plans")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Liste récupérée avec succès"),
@@ -361,7 +382,24 @@ public class PlanInventaireController {
         return ResponseEntity.ok(ecarts);
     }
 
-    @Transactional
+    @Operation(
+            summary = "Ajouter des produits au plan",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    required = true,
+                    description = "Liste des produits avec les zones où ils se trouvent",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Exemple de produits & zones",
+                                    value = "[ { \"produitId\": 10, \"zoneId\": 1 }, { \"produitId\": 11, \"zoneId\": 2 } ]"
+                            )
+                    )
+            ),
+                    responses = {
+                            @ApiResponse(responseCode = "200", description = "Produits ajoutés",
+                                    content = @Content(schema = @Schema(implementation = PlanInventaire.class)))
+                    }
+    )
     @PostMapping("{planId}/produits")
     public ResponseEntity<?> addProductsToPlan(@PathVariable Long planId, @RequestBody List<Map<String, Object>> productsWithZones) {
         try {
@@ -373,9 +411,6 @@ public class PlanInventaireController {
 
         for (Map<String, Object> productData : productsWithZones) {
             Long productId = Long.valueOf(productData.get("productId").toString());
-
-            // Safer type casting
-            @SuppressWarnings("unchecked")
             List<Object> rawZoneIds = (List<Object>) productData.get("zoneIds");
             List<Long> zoneIds = rawZoneIds.stream()
                 .map(id -> Long.valueOf(id.toString()))
@@ -384,13 +419,11 @@ public class PlanInventaireController {
             Produit produit = produitRepository.findById(productId)
                     .orElseThrow(() -> new EntityNotFoundException("Produit non trouvé: " + productId));
 
-            // Properly clear existing relationships
             for (Zone existingZone : new ArrayList<>(produit.getZones())) {
                 existingZone.getProduits().remove(produit);
                 produit.getZones().remove(existingZone);
             }
 
-            // Add new zone associations
             for (Long zoneId : zoneIds) {
                 Zone zone = zoneRepository.findById(zoneId)
                         .orElseThrow(() -> new EntityNotFoundException("Zone non trouvée: " + zoneId));
@@ -522,8 +555,6 @@ public class PlanInventaireController {
 
 private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
     PlanInventaireDTO dto = new PlanInventaireDTO();
-    
-    // Basic plan information
     dto.setId(plan.getId());
     dto.setNom(plan.getNom());
     dto.setDateDebut(plan.getDateDebut());
@@ -534,7 +565,6 @@ private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
     dto.setInclusTousProduits(plan.isInclusTousProduits());
     dto.setDateCreation(plan.getDateCreation());
 
-    // Map Zones with null check
     if (plan.getZones() != null) {
         plan.getZones().forEach(zone -> {
             if (zone != null) {
@@ -571,8 +601,6 @@ private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
             }
         });
     }
-
-    // Map Assignations with null check
     if (plan.getAssignations() != null) {
         plan.getAssignations().forEach(assignation -> {
             if (assignation != null) {
@@ -580,14 +608,12 @@ private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
                 assignationDTO.setId(assignation.getId());
                 assignationDTO.setDateAssignation(assignation.getDateAssignation());
 
-                // Map Zone in Assignation
                 if (assignation.getZone() != null) {
                     PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
                     zoneDTO.setId(assignation.getZone().getId());
                     assignationDTO.setZone(zoneDTO);
                 }
 
-                // Map Agent in Assignation
                 if (assignation.getAgent() != null) {
                     PlanInventaireDTO.AgentDTO agentDTO = new PlanInventaireDTO.AgentDTO();
                     agentDTO.setId(assignation.getAgent().getId());

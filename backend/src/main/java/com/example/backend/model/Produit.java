@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -20,11 +21,9 @@ import java.util.Set;
 @NoArgsConstructor
 @Entity
 public class Produit {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String codeBarre;
     private String reference;
     private String nom;
@@ -34,27 +33,21 @@ public class Produit {
     private LocalDateTime datecremod;
     private String imageUrl;
     private Integer quantitetheo;
-
     @ManyToOne
     @JoinColumn(name = "category_id")
     @JsonIgnoreProperties({"subCategories", "produits"})
     private Category category;
-
     @ManyToOne
     @JoinColumn(name = "sub_category_id")
     @JsonIgnoreProperties({"category", "produits"})
     private SubCategory subCategory;
-
     @ManyToMany(mappedBy = "produits")
     @JsonIgnoreProperties({"produits", "plans", "zoneProduits"})
     private List<Zone> zones = new ArrayList<>();
-
     @ManyToMany(mappedBy = "produits")
     @JsonIgnoreProperties({"zones", "produits", "assignations", "createur"})
     private List<PlanInventaire> plans = new ArrayList<>();
-
     @OneToMany(mappedBy = "produit", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties({"produit", "zone"})
     private Set<ZoneProduit> zoneProduits = new HashSet<>();
-
 }

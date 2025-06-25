@@ -50,7 +50,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,"/produits/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.DELETE,"/produits/{produitId}").hasAnyAuthority("SUPER_ADMIN", "ROLE_SUPER_ADMIN", "ADMIN_CLIENT", "ROLE_ADMIN_CLIENT")
                         //checkup management
-
                         .requestMatchers(HttpMethod.PUT,"/checkups/{checkupId}/recomptage","/checkups/{checkupId}/valider").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.GET,"/checkups/plan/{id}","/checkups/plan/{planId}/logs","/checkups/plan/{planId}/type/{type}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         // User management
