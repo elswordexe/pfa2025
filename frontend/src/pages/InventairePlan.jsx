@@ -45,7 +45,7 @@ const userId = getUserIdFromToken();
   const [agents, setAgents] = useState([]);
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: Plan, 2: Assignation, 3: Confirmation
+  const [step, setStep] = useState(1); 
 
   const [productFilters, setProductFilters] = useState({
     categories: [],
@@ -71,6 +71,7 @@ const token = localStorage.getItem('token');
       
       const zonesData = zonesRes.data;
       const agentsData = agentsRes.data;
+
       
       setZones(zonesData);
       setAgents(agentsData);
@@ -91,8 +92,6 @@ const token = localStorage.getItem('token');
     }
   };
 
-  // 1. Création du plan
- // Fonction handleSubmit corrigée
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
@@ -116,12 +115,9 @@ const handleSubmit = async (e) => {
 };
       const jsonData = JSON.stringify(requestData, null, 2);
       console.log('Données envoyées (format exact Postman):', jsonData);
-      const response = await fetch('http://localhost:8080/api/plans', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': '*/*'
-        },
+      const response = await axios.post('http://localhost:8080/api/plans', {
+         method: 'POST',
+        headers: authHeaders,
         body: jsonData
     }); 
       const responseData = await response.json();
@@ -133,8 +129,7 @@ const handleSubmit = async (e) => {
 
       if (responseData.id) {
         console.log(`Plan créé avec succès, ID: ${responseData.id}`);
-        // Stocker l'ID du plan si nécessaire
-        setPlan(prev => ({ ...prev, id: responseData.id }));
+                setPlan(prev => ({ ...prev, id: respeData.id }));
         setStep(3);
       } else {
         throw new Error('Le plan n\'a pas été créé correctement');
@@ -252,7 +247,6 @@ const handleSubmit = async (e) => {
               </Grid>
             </Grid>
 
-            {/* Add after the zones selection Grid and before the dates Grid */}
             <Grid container spacing={2} sx={{ mt: 2 }}>
               <Grid xs={12}>
                 <Card variant="outlined" sx={{ p: 2, display: plan.zones.length ? 'block' : 'none' }}>
@@ -323,7 +317,6 @@ const handleSubmit = async (e) => {
               </Grid>
             </Grid>
 
-            {/* Separate FormControl for product selection */}
             <FormLabel>Sélection des produits</FormLabel>
             <Stack spacing={2}>
               {plan.type !== 'COMPLET' && (
@@ -408,7 +401,6 @@ const handleSubmit = async (e) => {
               )}
             </Stack>
             
-            {/* Add validation for the Submit button */}
             <Button 
               color="primary"
               onClick={() => setStep(2)}
@@ -417,7 +409,7 @@ const handleSubmit = async (e) => {
                 !plan.dateDebut || 
                 !plan.dateFin || 
                 new Date(plan.dateFin) <= new Date(plan.dateDebut) ||
-                plan.zones.length === 0 // Add this condition
+                plan.zones.length === 0
               }
             >
               Suivant : Assignation des Agents

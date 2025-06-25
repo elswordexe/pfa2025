@@ -33,7 +33,8 @@ function App() {
     const checkToken = () => {
       if (isTokenExpired()) {
         localStorage.removeItem('token');
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        const publicPaths = ['/login', '/register', '/reset-password', '/verify'];
+        if (!publicPaths.includes(window.location.pathname)) {
           window.location.href = '/login';
         }
       }

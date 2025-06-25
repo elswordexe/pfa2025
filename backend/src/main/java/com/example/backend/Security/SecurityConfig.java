@@ -45,7 +45,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/checkups/ajouter","/checkups/scan","/produits","/api/plans","/api/plans/**","produits/byZone/*","Zone/all","api/plans/names-dates","produits/names-dates","produits","users/countAdminClient","api/plans/countByStatus","users/names-dates","api/plans/countterminer","produits/count","Zone/count","/users/login","users/countAgentInventaire", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("reset-password/**","/forgot-password","/checkups/ajouter","/checkups/scan","/produits","/api/plans","/api/plans/**","produits/byZone/*","Zone/all","api/plans/names-dates","produits/names-dates","produits","users/countAdminClient","api/plans/countByStatus","users/names-dates","api/plans/countterminer","produits/count","Zone/count","/users/login","users/countAgentInventaire", "/users/register", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         //produit management
                         .requestMatchers(HttpMethod.PUT,"/produits/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.DELETE,"/produits/{produitId}").hasAnyAuthority("SUPER_ADMIN", "ROLE_SUPER_ADMIN", "ADMIN_CLIENT", "ROLE_ADMIN_CLIENT")

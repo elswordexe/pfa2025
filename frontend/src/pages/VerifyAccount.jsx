@@ -16,7 +16,6 @@ const VerifyAccount = () => {
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
   const [progress, setProgress] = useState(0);
-  const [isVerifying, setIsVerifying] = useState(true);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -27,66 +26,6 @@ const VerifyAccount = () => {
       setMessage("Aucun token fourni.");
       return;
     }
-
-    const verifyAccount = async () => {
-      try {
-        console.log("Starting verification with token:", token);
-        // First, check if token exists and get user email
-        const checkResponse = await axios.get(`http://localhost:8080/users/check-token?token=${token}`);
-        const userEmail = checkResponse.data.email;
-
-        // Then validate the token
-        const response = await axios.get(`http://localhost:8080/users/validate?token=${token}`);
-        console.log("Initial verification response:", response.data);
-        
-        setStatus('verifying');
-        setMessage("Compte vérifié, vérification de l'activation...");
-
-        // Poll for enabled status
-        const checkEnabled = async () => {
-          try {
-            const userResponse = await axios.get(
-              `http://localhost:8080/users/check-status?email=${userEmail}`
-            );
-            
-            if (userResponse.data.enabled) {
-              setStatus('success');
-              setMessage("Compte vérifié et activé avec succès!");
-              
-              // Redirect countdown
-              let secondsLeft = 5;
-              const redirectInterval = setInterval(() => {
-                secondsLeft--;
-                setProgress((5 - secondsLeft) * 20);
-                
-                if (secondsLeft === 0) {
-                  clearInterval(redirectInterval);
-                  navigate('/login');
-                }
-              }, 1000);
-            }
-          } catch (error) {
-            console.error("Status check error:", error);
-            setStatus('error');
-            setMessage("Erreur lors de la vérification du statut du compte.");
-          }
-        };
-
-        // Wait 5 seconds before checking enabled status
-        setTimeout(() => {
-          checkEnabled();
-          setIsVerifying(false);
-        }, 5000);
-
-      } catch (error) {
-        console.error("Verification error:", error.response?.data);
-        setStatus('error');
-        setMessage(error.response?.data?.message || 'Erreur de validation du compte.');
-        setIsVerifying(false);
-      }
-    };
-
-    verifyAccount();
   }, [navigate]);
 
   return (

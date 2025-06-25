@@ -159,11 +159,9 @@ const [showPDF, setShowPDF] = useState(false);
 
   const handleEditSubmit = async () => {
     try {
-      const response = await fetch(`http://localhost:8080/produits/${editingProduct.id}`, {
+      const response = await axios.put(`http://localhost:8080/produits/${editingProduct.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+         headers: authHeaders,
         body: JSON.stringify(editingProduct)
       });
 
@@ -200,41 +198,6 @@ const [showPDF, setShowPDF] = useState(false);
     }
     return 'background.surface'; 
   };
-
-  const handleValider = async (product) => {
-    try {
-      const manualQty = Number(product.manualQuantity);
-      const scannedQty = Number(product.scannedQuantity);
-
-      if (manualQty === scannedQty) {
-        await fetch(`http://localhost:8080/produits/${product.id}/updateQuantite`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            quantiteTheorique: manualQty
-          })
-        });
-
-        await fetch(`http://localhost:8080/checkups/${product.checkupId}/valider`, {
-          method: 'PUT'
-        });
-
-        setValidatedProducts(prev => new Set([...prev, product.id]));
-        
-        setTimeout(() => {
-          setProducts(prevProducts => 
-            prevProducts.filter(p => p.id !== product.id)
-          );
-        }, 1000);
-      }
-    } catch (error) {
-      console.error('Error validating product:', error);
-      setError('Erreur lors de la validation du produit');
-    }
-  };
-
   return (
     <>
       <div className="flex min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
