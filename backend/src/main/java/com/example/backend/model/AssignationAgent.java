@@ -1,6 +1,7 @@
 package com.example.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,6 +19,7 @@ public class AssignationAgent {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id")
+    @JsonIgnore
     private PlanInventaire planInventaire;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -26,7 +28,7 @@ public class AssignationAgent {
     @JsonBackReference(value = "agent-assignations")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agent_id")
-    private Utilisateur agent;
+    private AgentInventaire agent;
 
     @Column(name = "date_assignation")
     private LocalDateTime dateAssignation;

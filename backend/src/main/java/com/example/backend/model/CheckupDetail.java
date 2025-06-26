@@ -29,4 +29,11 @@ public class CheckupDetail {
 
     private Integer scannedQuantity;
     private Integer manualQuantity;
+    
+    @Enumerated(EnumType.STRING)
+    private CheckupType type;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "zone_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer"})
+    private Zone zone;
 }

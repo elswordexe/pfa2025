@@ -96,8 +96,12 @@ public class ZoneController {
     )
     @DeleteMapping("Zones/{zoneId}")
     public ResponseEntity<?> deleteZone(@PathVariable Long zoneId){
-        zoneRepository.deleteById(zoneId);
-        return ResponseEntity.ok().build();
+        return zoneRepository.findById(zoneId)
+            .map(zone -> {
+                zoneRepository.delete(zone); // la suppression en cascade gère les relations
+                return ResponseEntity.ok().build();
+            })
+            .orElse(ResponseEntity.notFound().build());
     }
     @Operation(summary = "lister les produits d une zone spécifique ")
     @ApiResponses(value ={
@@ -226,6 +230,11 @@ public class ZoneController {
 
         Zone updatedZone = zoneRepository.save(existingZone);
         return ResponseEntity.ok(updatedZone);
+    }
+
+    @PatchMapping("/Zone/update/{id}")
+    public ResponseEntity<?> patchUpdateZone(@PathVariable Long id, @RequestBody ZoneDTO zoneDTO) {
+        return updateZone(id, zoneDTO);
     }
 
     @PostMapping("Zone")

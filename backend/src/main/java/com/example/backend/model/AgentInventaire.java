@@ -13,9 +13,9 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @DiscriminatorValue("AGENT_INVENTAIRE")
 public class AgentInventaire extends Utilisateur {
-
     @ManyToOne
     private Client client;
+
     @JsonManagedReference(value = "agent-assignations")
     @OneToMany(mappedBy = "agent", cascade = CascadeType.ALL)
     private List<AssignationAgent> assignations;

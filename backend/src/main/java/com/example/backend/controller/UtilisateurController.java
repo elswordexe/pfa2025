@@ -1,7 +1,6 @@
 package com.example.backend.controller;
 
 import com.example.backend.model.*;
-import com.example.backend.repository.EmailVerificationTokenRepository;
 import com.example.backend.repository.UtilisateurRepository;
 import com.example.backend.service.AgentService;
 import com.example.backend.service.EmailService;
@@ -37,12 +36,9 @@ public class UtilisateurController {
 
     @Autowired
     private JwtService jwtService;
-    @Autowired
-    private EmailVerificationTokenRepository tokenRepository;
 
     @Autowired
     private EmailService emailService;
-
 
     @Autowired
     private UtilisateurRepository utilisateurRepository;
@@ -59,101 +55,7 @@ public class UtilisateurController {
     public List<Utilisateur> getAllUtilisateurs() {
         return (List<Utilisateur>) utilisateurRepository.findAll();
     }
-    @Operation(summary = "Lister tous les Agents inventaires")
-    @ApiResponses(value = {@ApiResponse(responseCode = "200",description = "lister tous les AG.Inv")})
-    @GetMapping("AgentInventaire")
-    public List<Utilisateur> getAllAgentsInventaires() {
-        return  utilisateurRepository.findByRole(Role.AGENT_INVENTAIRE);
-    }
-    @PostMapping("users/register")
-    public ResponseEntity<?> registerUtilisateur(@RequestBody Utilisateur utilisateur) {
-        try {
-            System.out.println("Registering user: " + utilisateur.getEmail());
 
-            utilisateur.setPassword(passwordEncoder.encode(utilisateur.getPassword()));
-            utilisateurRepository.save(utilisateur);
-
-            String token = UUID.randomUUID().toString();
-            System.out.println("Generated token: " + token);
-
-            EmailVerificationToken verificationToken = new EmailVerificationToken();
-            verificationToken.setToken(token);
-            verificationToken.setUtilisateur(utilisateur);
-            verificationToken.setExpiration(LocalDateTime.now().plusDays(1));
-            
-            EmailVerificationToken savedToken = tokenRepository.save(verificationToken);
-            System.out.println("Saved token ID: " + savedToken.getId());
-
-            // Send verification email
-            emailService.sendVerificationEmail(utilisateur.getEmail(), token);
-            System.out.println("Verification email sent to: " + utilisateur.getEmail());
-
-            return ResponseEntity.ok(Map.of(
-                "message", "Utilisateur enregistré. Veuillez vérifier votre email pour activer le compte.",
-                "user", utilisateur,
-                "debugToken", token
-            ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
-    }
-    @GetMapping("/users/check-token")
-public ResponseEntity<?> checkToken(@RequestParam("token") String token) {
-    try {
-        Optional<EmailVerificationToken> tokenOpt = tokenRepository.findByToken(token);
-        if (tokenOpt.isEmpty()) {
-            return ResponseEntity.badRequest()
-                .body(Map.of("message", "Token non trouvé"));
-        }
-
-        EmailVerificationToken verificationToken = tokenOpt.get();
-        Utilisateur utilisateur = verificationToken.getUtilisateur();
-
-        return ResponseEntity.ok(Map.of(
-            "valid", true,
-            "email", utilisateur.getEmail()
-        ));
-    } catch (Exception e) {
-        return ResponseEntity.badRequest()
-            .body(Map.of("message", e.getMessage()));
-    }
-}
-
-@GetMapping("/users/validate")
-public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
-    try {
-        Optional<EmailVerificationToken> tokenOpt = tokenRepository.findByToken(token);
-        if (tokenOpt.isEmpty()) {
-            return ResponseEntity.badRequest()
-                .body(Map.of("message", "Lien de vérification invalide."));
-        }
-
-        EmailVerificationToken verificationToken = tokenOpt.get();
-        Utilisateur utilisateur = verificationToken.getUtilisateur();
-
-        if (utilisateur.isEnabled()) {
-            return ResponseEntity.ok()
-                .body(Map.of(
-                    "message", "Compte déjà vérifié !",
-                    "email", utilisateur.getEmail()
-                ));
-        }
-        utilisateurRepository.save(utilisateur);
-
-        // Only delete token after successful verification
-        tokenRepository.delete(verificationToken);
-
-        return ResponseEntity.ok()
-            .body(Map.of(
-                "message", "Compte vérifié avec succès !",
-                "email", utilisateur.getEmail()
-            ));
-    } catch (Exception e) {
-        return ResponseEntity.badRequest()
-            .body(Map.of("message", "Erreur lors de la vérification: " + e.getMessage()));
-    }
-}
     @Autowired
     private AgentService agentService;
 
@@ -164,7 +66,7 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
             agentService.assignAgentToPlan(agentId, planId);
             return ResponseEntity.ok("Agent assigné au plan avec succès.");
         } catch (Exception e) {
-            e.printStackTrace(); // utile pour debug
+            e.printStackTrace();
             return ResponseEntity.badRequest().body("Erreur : " + e.getMessage());
         }
     }
@@ -181,7 +83,7 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
             return ResponseEntity.badRequest().body("Erreur : " + e.getMessage());
         }
     }
-
+    //test
     @Operation(summary = "Créer un compte administrateur client", description = "Crée un compte admin pour un client spécifique")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Admin client créé avec succès"),
@@ -238,7 +140,6 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                         .body(Map.of("message", "Email ou mot de passe incorrect"));
             }
-
             Utilisateur user = userOpt.get();
             String jwtToken = jwtService.generateToken(user);
             Map<String, Object> userMap = new HashMap<>();
@@ -359,24 +260,6 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
         }).orElse(ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/verify")
-    @Operation(summary = "Vérifier l'email d'un utilisateur")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Email vérifié avec succès"),
-        @ApiResponse(responseCode = "400", description = "Token invalide ou expiré")
-    })
-    public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-        try {
-            Utilisateur user = utilisateurService.verifyEmail(token);
-            return ResponseEntity.ok(Map.of(
-                "message", "Email vérifié avec succès",
-                "email", user.getEmail()
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                .body(Map.of("message", "Erreur de vérification: " + e.getMessage()));
-        }
-    }
 
     @PostMapping("/forgot-password")
     @Operation(summary = "Demander la réinitialisation du mot de passe")
@@ -389,7 +272,7 @@ public ResponseEntity<?> verifyAccount(@RequestParam("token") String token) {
             String email = request.get("email");
             utilisateurService.initiatePasswordReset(email);
             return ResponseEntity.ok(Map.of(
-                "message", "Si l'email existe, un lien de réinitialisation a été envoyé"
+                "message", "un lien de réinitialisation a été envoyé a votre email"
             ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)

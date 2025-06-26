@@ -14,9 +14,6 @@ import java.util.List;
 public class CheckupDTO {
     private Long id;
     
-    @NotNull(message = "Type de checkup est requis")
-    private CheckupType type;
-    
     @NotNull(message = "Agent est requis")
     @Valid
     private AgentDTO agent;
@@ -63,6 +60,11 @@ public class CheckupDTO {
         
         private Integer scannedQuantity;
         private Integer manualQuantity;
+        private CheckupType type;
+        
+        @NotNull(message = "Zone est requise")
+        @Valid
+        private ZoneDTO zone;
     }
 
     @Data
@@ -89,5 +91,11 @@ public class CheckupDTO {
         
         private CategoryDTO category;
         private SubCategoryDTO subCategory;
+    }
+
+    @Data
+    public static class ZoneDTO {
+        private Long id;
+        private String name;
     }
 }

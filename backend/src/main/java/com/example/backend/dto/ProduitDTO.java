@@ -18,6 +18,7 @@ public class ProduitDTO {
     private SubCategoryDTO subCategoryDTO;
     private CategoryDTO category;
     private SubCategoryDTO subCategory;
+    private java.util.List<ZoneDTO> zones = new java.util.ArrayList<>();
 
     @Data
     public static class CategoryDTO {
@@ -31,5 +32,11 @@ public class ProduitDTO {
         private Long categoryId;
         private CategoryDTO category;
         private SubCategoryDTO subCategory;
+    }
+
+    @Data
+    public static class ZoneDTO {
+        private Long id;
+        private String name;
     }
 }

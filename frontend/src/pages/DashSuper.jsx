@@ -5,15 +5,15 @@ import Button from '@mui/joy/Button';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import Breadcrumbs from '@mui/joy/Breadcrumbs';
-import PlanStatusChart from './PlanStatusChart';
-import Sidebarsuper from './Sidebar';
-import DashboardCards from './DashboardCards';
-import LatestUpdates from './LatestUpdates';
+import PlanStatusChart from '../components/PlanStatusChart';
+import Sidebar from '../components/Sidebar';
+import DashboardCardSuper from '../components/DashboardCardSuper';
+import LatestUpdates from '../components/LatestUpdatesSuper';
 
-export default function Dash() {
+export default function DashSuper() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: { xs: 'column', md: 'row' } }}>
-      <Sidebarsuper />
+      <Sidebar />
 
       <Box
         component="main"
@@ -30,7 +30,6 @@ export default function Dash() {
           overflowY: 'auto',
         }}
       >
-       
         <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
           <Breadcrumbs
             size="sm"
@@ -65,7 +64,7 @@ export default function Dash() {
         </Box>
 
         {/* Cards */}
-        <DashboardCards />
+        <DashboardCardSuper />
 
         <Box
           sx={{

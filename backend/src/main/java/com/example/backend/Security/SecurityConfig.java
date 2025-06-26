@@ -50,7 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT,"/produits/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.DELETE,"/produits/{produitId}").hasAnyAuthority("SUPER_ADMIN", "ROLE_SUPER_ADMIN", "ADMIN_CLIENT", "ROLE_ADMIN_CLIENT")
                         //checkup management
-                        .requestMatchers(HttpMethod.PUT,"/checkups/{checkupId}/recomptage","/checkups/{checkupId}/valider").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.PUT,"/checkups/{checkupId}/recomptage","/checkups/{checkupId}/valider").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         .requestMatchers(HttpMethod.GET,"/checkups/plan/{id}","/checkups/plan/{planId}/logs","/checkups/plan/{planId}/type/{type}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         // User management
                         .requestMatchers(HttpMethod.GET ,"/users","users/count","users/countAdminClient").hasAnyAuthority("SUPER_ADMIN")
@@ -71,9 +71,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/categories/{id}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.DELETE, "/api/categories/**").hasAnyAuthority("SUPER_ADMIN","ADMIN_CLIENT")
                         //plans
-                        .requestMatchers(HttpMethod.GET,"api/plans","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
+                        .requestMatchers(HttpMethod.GET,"/api/plans","/api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         .requestMatchers(HttpMethod.GET, "/api/plans/{planId}/produits","/api/plans/{planId}/details","/api/plans/{planId}/zone-products","/api/plans/createdby/{userId}","/api/plans/createdby/me").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                        .requestMatchers(HttpMethod.POST, "/api/plans","/api/plans/{planId}/zones","/api/plans/{planId}/produits","/api/plans/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/plans","/api/plans/{planId}/zones","/api/plans/{planId}/produits","/api/plans/{planId}/agents/{agentId}","/api/plans/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.PUT, "api/plans/{planId}/statut","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         // Zone manage
                         .requestMatchers(HttpMethod.GET, "/Zone/all","/Zones/{zoneId}/products","/Zone/count").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
@@ -96,7 +96,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE","PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

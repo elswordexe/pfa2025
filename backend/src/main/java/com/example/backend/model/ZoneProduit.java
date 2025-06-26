@@ -23,8 +23,8 @@ public class ZoneProduit {
     private Produit produit;
 
     private Integer quantiteTheorique;
-    
-    // Ajout du nouveau champ
+
     private Integer quantiteReelle;
 
+    private boolean verified = false;
 }

@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,6 +42,9 @@ public class CheckupController {
 
     @Autowired
     private ProduitRepository produitRepository;
+
+    @Autowired
+    private ZoneRepository zoneRepository;
 
     @Operation(
             summary = "Ajouter un nouveau checkup",
@@ -67,6 +71,18 @@ public class CheckupController {
     public ResponseEntity<?> addCheckup(@RequestBody CheckupDTO checkupDTO) {
         try {
             Checkup checkup = convertToEntity(checkupDTO);
+            if (checkupDTO.getDetails() != null && checkup.getDetails() != null) {
+                for (int i = 0; i < checkupDTO.getDetails().size(); i++) {
+                    CheckupDTO.CheckupDetailDTO dtoDetail = checkupDTO.getDetails().get(i);
+                    CheckupDetail entityDetail = checkup.getDetails().get(i);
+                    if (dtoDetail.getType() == CheckupType.MANUEL && dtoDetail.getManualQuantity() != null) {
+                        entityDetail.setManualQuantity(dtoDetail.getManualQuantity());
+                    }
+                    if (dtoDetail.getType() == CheckupType.SCAN && dtoDetail.getScannedQuantity() != null) {
+                        entityDetail.setScannedQuantity(dtoDetail.getScannedQuantity());
+                    }
+                }
+            }
             Checkup savedCheckup = checkupRepository.save(checkup);
             CheckupDTO responseDTO = convertToDTO(savedCheckup);
         
@@ -193,8 +209,11 @@ public class CheckupController {
             checkup.setJustificationRecomptage(request.getJustification());
             if (checkup.getDetails() != null) {
                 checkup.getDetails().forEach(detail -> {
-                    detail.setScannedQuantity(0);
-                    detail.setManualQuantity(0);
+                    if (detail.getType() == CheckupType.MANUEL) {
+                        detail.setManualQuantity(0);
+                    } else if (detail.getType() == CheckupType.SCAN) {
+                        detail.setScannedQuantity(0);
+                    }
                 });
             }
             checkupRepository.save(checkup);
@@ -300,7 +319,6 @@ public class CheckupController {
         Checkup checkup = new Checkup();
 
         checkup.setId(dto.getId());
-        checkup.setType(dto.getType());
         checkup.setValide(dto.isValide());
         checkup.setDemandeRecomptage(dto.isDemandeRecomptage());
         checkup.setJustificationRecomptage(dto.getJustificationRecomptage());
@@ -324,12 +342,19 @@ public class CheckupController {
                 detail.setId(detailDTO.getId());
                 detail.setScannedQuantity(detailDTO.getScannedQuantity());
                 detail.setManualQuantity(detailDTO.getManualQuantity());
+                detail.setType(detailDTO.getType());
                 detail.setCheckup(checkup);
 
                 if (detailDTO.getProduit() != null && detailDTO.getProduit().getId() != null) {
                     Produit produit = produitRepository.findById(detailDTO.getProduit().getId())
                             .orElseThrow(() -> new EntityNotFoundException("Produit not found with ID: " + detailDTO.getProduit().getId()));
                     detail.setProduit(produit);
+                }
+
+                if (detailDTO.getZone() != null && detailDTO.getZone().getId() != null) {
+                    Zone zone = zoneRepository.findById(detailDTO.getZone().getId())
+                            .orElseThrow(() -> new EntityNotFoundException("Zone not found with ID: " + detailDTO.getZone().getId()));
+                    detail.setZone(zone);
                 }
 
                 details.add(detail);
@@ -345,7 +370,6 @@ public class CheckupController {
         CheckupDTO dto = new CheckupDTO();
 
         dto.setId(entity.getId());
-        dto.setType(entity.getType());
         dto.setDateCheck(entity.getDateCheck());
         dto.setValide(entity.isValide());
         dto.setDemandeRecomptage(entity.isDemandeRecomptage());
@@ -389,6 +413,7 @@ public class CheckupController {
         detailDTO.setId(detail.getId());
         detailDTO.setScannedQuantity(detail.getScannedQuantity());
         detailDTO.setManualQuantity(detail.getManualQuantity());
+        detailDTO.setType(detail.getType());
 
         if (detail.getProduit() != null) {
             CheckupDTO.ProduitDTO produitDTO = new CheckupDTO.ProduitDTO();
@@ -411,6 +436,13 @@ public class CheckupController {
                 subCategoryDTO.setId(detail.getProduit().getSubCategory().getId());
                 subCategoryDTO.setName(detail.getProduit().getSubCategory().getName());
                 produitDTO.setSubCategory(subCategoryDTO);
+            }
+
+            if (detail.getZone() != null) {
+                CheckupDTO.ZoneDTO z = new CheckupDTO.ZoneDTO();
+                z.setId(detail.getZone().getId());
+                z.setName(detail.getZone().getName());
+                detailDTO.setZone(z);
             }
 
             detailDTO.setProduit(produitDTO);

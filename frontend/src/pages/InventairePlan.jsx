@@ -35,13 +35,14 @@ const userId = getUserIdFromToken();
     dateDebut: '',
     dateFin: '',
     type: 'COMPLET',
+    recurrence: '', // <-- add recurrence field
     zones: [],
     produits: [],
     statut: 'Indefini',
     createur: { id: userId },
   });
 
-  const [selectedAgents, setSelectedAgents] = useState({});
+  const [selectedAgentId, setSelectedAgentId] = useState('');
   const [agents, setAgents] = useState([]);
   const [zones, setZones] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,8 +66,8 @@ const token = localStorage.getItem('token');
   const fetchZonesAndAgents = async () => {
     try {
       const [zonesRes, agentsRes] = await Promise.all([
-        axios.get('http://localhost:8080/Zone/all'),
-        axios.get('http://localhost:8080/users/agents')
+        axios.get('http://localhost:8080/Zone/all', { headers: authHeaders }),
+        axios.get('http://localhost:8080/users/agents', { headers: authHeaders })
       ]);
       
       const zonesData = zonesRes.data;
@@ -83,8 +84,7 @@ const token = localStorage.getItem('token');
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch('http://localhost:8080/produits');
-      const data = await response.json();
+      const { data } = await axios.get('http://localhost:8080/produits');
       setAllProducts(data);
       setFilteredProducts(data);
     } catch (error) {
@@ -104,6 +104,7 @@ const handleSubmit = async (e) => {
   dateDebut: plan.dateDebut,
   dateFin: plan.dateFin,
   type: plan.type,
+  recurrence: plan.recurrence, // <-- send recurrence
   zones: plan.zones.map(zoneId => ({
     id: typeof zoneId === 'string' ? parseInt(zoneId) : zoneId
   })),
@@ -113,26 +114,35 @@ const handleSubmit = async (e) => {
   statut: "Indefini",
   createur: { id: userId }
 };
-      const jsonData = JSON.stringify(requestData, null, 2);
-      console.log('Données envoyées (format exact Postman):', jsonData);
-      const response = await axios.post('http://localhost:8080/api/plans', {
-         method: 'POST',
-        headers: authHeaders,
-        body: jsonData
-    }); 
-      const responseData = await response.json();
-      console.log('Réponse du serveur:', responseData);
+      console.log('Données envoyées (format exact Postman):', requestData);
 
-      if (!response.ok) {
-        throw new Error(responseData.message || `Erreur HTTP ${response.status}`);
-      }
+      const { data } = await axios.post(
+        'http://localhost:8080/api/plans',
+        requestData,
+        { headers: { ...authHeaders, 'Content-Type': 'application/json' } }
+      );
 
-      if (responseData.id) {
-        console.log(`Plan créé avec succès, ID: ${responseData.id}`);
-                setPlan(prev => ({ ...prev, id: respeData.id }));
+      if (data.id) {
+        console.log(`Plan créé avec succès, ID: ${data.id}`);
+        setPlan(prev => ({ ...prev, id: data.id }));
+        if (selectedAgentId) {
+          try {
+            await axios.post(
+              `http://localhost:8080/api/plans/${data.id}/agents/${selectedAgentId}/assignations`,
+              null,
+              {
+                headers: { ...authHeaders }
+              }
+            );
+            console.log('Agent assigné à toutes les zones du plan');
+          } catch (assignError) {
+            console.error("Erreur lors de l'assignation de l'agent:", assignError);
+          }
+        }
+
         setStep(3);
       } else {
-        throw new Error('Le plan n\'a pas été créé correctement');
+        throw new Error('Réponse inattendue du serveur');
       }
 
   } catch (error) {
@@ -170,7 +180,6 @@ const handleSubmit = async (e) => {
         return (
           <Stack spacing={3}>
             <Grid container spacing={2}>
-              {/* Remove 'item' prop from Grid components */}
               <Grid xs={12} md={6}>
                 <FormControl className="bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-500 transition-colors">
                   <FormLabel className="text-gray-700 font-medium mb-2">Nom du plan</FormLabel>
@@ -200,6 +209,21 @@ const handleSubmit = async (e) => {
                     <Option value="COMPLET">Complet</Option>
                     <Option value="PARTIEL">Partiel</Option>
                     <Option value="TOURNANT">Tournant</Option>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid xs={12} md={6}>
+                <FormControl className="bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-500 transition-colors">
+                  <FormLabel className="text-gray-700 font-medium mb-2">Récurrence</FormLabel>
+                  <Select
+                    className="w-full bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={plan.recurrence || ''}
+                    onChange={(e, value) => setPlan(prev => ({ ...prev, recurrence: value }))}
+                  >
+                    <Option value="MENSUEL">Mensuelle</Option>
+                    <Option value="HEBDOMADAIRE">Hebdomadaire</Option>
+                    <Option value="QUOTIDIENNE">Quotidienne</Option>
+                    <Option value="TRIMESTRIELLE">Trimestrielle</Option>
                   </Select>
                 </FormControl>
               </Grid>
@@ -323,15 +347,32 @@ const handleSubmit = async (e) => {
                 <FormControl>
                   <Checkbox
                     checked={plan.inclusTousProduits}
-                    onChange={(e) => setPlan(prev => ({
-                      ...prev,
-                      inclusTousProduits: e.target.checked
-                    }))}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setPlan(prev => {
+                        // If checked, include all products from selected zones
+                        if (checked) {
+                          const productsInZones = allProducts.filter(product =>
+                            (product.zones || []).some(zone => plan.zones.includes(zone.id))
+                          ).map(p => p.id);
+                          return {
+                            ...prev,
+                            inclusTousProduits: true,
+                            produits: productsInZones
+                          };
+                        } else {
+                          return {
+                            ...prev,
+                            inclusTousProduits: false,
+                            produits: []
+                          };
+                        }
+                      });
+                    }}
                     label="Inclure tous les produits des zones sélectionnées"
                   />
                 </FormControl>
               )}
-              
               {plan.type !== 'COMPLET' && !plan.inclusTousProduits && (
                 <>
                   <FormControl>
@@ -344,8 +385,9 @@ const handleSubmit = async (e) => {
                           ...prev,
                           searchTerm
                         }));
+                        // Only show products from selected zones
                         const productsInSelectedZones = allProducts.filter(product =>
-                          product.zones.some(zone => plan.zones.includes(zone.id))
+                          (product.zones || []).some(zone => plan.zones.includes(zone.id))
                         );
                         setFilteredProducts(
                           productsInSelectedZones.filter(product =>
@@ -357,7 +399,6 @@ const handleSubmit = async (e) => {
                       endDecorator={<SearchIcon />}
                     />
                   </FormControl>
-
                   <FormControl>
                     <Select
                       multiple
@@ -385,12 +426,12 @@ const handleSubmit = async (e) => {
                               </Chip>
                             );
                           })}
-                       
-                      
-                       </Box>
+                        </Box>
                       )}
                     >
-                      {filteredProducts.map((product) => (
+                      {allProducts.filter(product =>
+                        (product.zones || []).some(zone => plan.zones.includes(zone.id))
+                      ).map((product) => (
                         <Option key={product.id} value={product.id}>
                           {product.nom} - {product.codeBarre}
                         </Option>
@@ -418,30 +459,20 @@ const handleSubmit = async (e) => {
         );        case 2:
         return (
           <Stack spacing={3}>
-            <Typography level="h5">Assignation des Agents aux Zones</Typography>            {plan.zones.map(zoneId => {
-              const zone = zones.find(z => z.id === zoneId);
-              return (
-                <FormControl key={zoneId}>
-                  <FormLabel>{zone?.name}</FormLabel>
-                  <Select
-                    value={selectedAgents[zoneId] || ''}
-                    onChange={(e, value) => setSelectedAgents({
-                      ...selectedAgents,
-                      [zoneId]: value
-                    })}
-                  >
-                    {agents.map(agent => (
-                      <Option 
-                        key={agent.id} 
-                        value={agent.id}
-                      >
-                        {`${agent.firstName} ${agent.lastName}`}
-                      </Option>
-                    ))}
-                  </Select>
-                </FormControl>
-              );
-            })}
+            <Typography level="h5">Sélectionner l'Agent pour le Plan</Typography>
+            <FormControl>
+              <FormLabel>Agent</FormLabel>
+              <Select
+                value={selectedAgentId}
+                onChange={(e, value) => setSelectedAgentId(value)}
+              >
+                {agents.map(agent => (
+                  <Option key={agent.id} value={agent.id}>
+                    {`${agent.firstName} ${agent.lastName}`}
+                  </Option>
+                ))}
+              </Select>
+            </FormControl>
           </Stack>
         );
     case 3:
@@ -539,7 +570,7 @@ const handleSubmit = async (e) => {
                     )}
                     <button
                       onClick={step === 1 ? () => setStep(2) : handleSubmit}
-                      disabled={loading || !plan.nom || !plan.dateDebut || !plan.dateFin || plan.zones.length === 0}
+                      disabled={loading || (step === 1 ? (!plan.nom || !plan.dateDebut || !plan.dateFin || plan.zones.length === 0) : !selectedAgentId)}
                       className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg 
                         hover:from-blue-700 hover:to-indigo-800 shadow-md transition disabled:opacity-50 
                         disabled:cursor-not-allowed flex items-center gap-2"

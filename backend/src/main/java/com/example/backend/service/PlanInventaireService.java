@@ -45,33 +45,25 @@ public class PlanInventaireService {
             plan.setDateFin(planDTO.getDateFin());
             plan.setType(TYPE.valueOf(planDTO.getType()));
             plan.setStatut(STATUS.valueOf(planDTO.getStatut()));
-
-            // Set default recurrence if not provided
             String recurrence = planDTO.getRecurrence();
             if (recurrence == null || recurrence.isEmpty()) {
                 recurrence = "MENSUEL";
             }
             plan.setRecurrence(RECCURENCE.valueOf(recurrence));
 
-            // Set inclusTousProduits based on type
             plan.setInclusTousProduits(TYPE.COMPLET.equals(plan.getType()));
-
-            // Handle zones
             Set<Zone> zones = planDTO.getZones().stream()
                 .map(zoneDTO -> zoneRepository.findById(zoneDTO.getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Zone not found: " + zoneDTO.getId())))
                 .collect(Collectors.toSet());
             plan.setZones(zones);
 
-            // Handle products based on type
             if (TYPE.COMPLET.equals(plan.getType())) {
-                // For COMPLET type, include all products from selected zones
                 Set<Produit> allZoneProducts = zones.stream()
                     .flatMap(zone -> zone.getProduits().stream())
                     .collect(Collectors.toSet());
                 plan.setProduits(allZoneProducts);
             } else if (planDTO.getProduits() != null && !planDTO.getProduits().isEmpty()) {
-                // For PARTIEL type, validate and include only selected products
                 Set<Produit> selectedProducts = planDTO.getProduits().stream()
                     .map(produitDTO -> produitRepository.findById(produitDTO.getId())
                         .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + produitDTO.getId())))
@@ -83,12 +75,12 @@ public class PlanInventaireService {
                         .map(assignationDTO -> {
                             Zone zone = zoneRepository.findById(assignationDTO.getZone().getId())
                                     .orElseThrow(() -> new ResourceNotFoundException("Zone not found: " + assignationDTO.getZone().getId()));
-                            Utilisateur agent = utilisateurRepository.findById(assignationDTO.getAgent().getId())
+                            AgentInventaire agent = (AgentInventaire) utilisateurRepository.findById(assignationDTO.getAgent().getId())
                                     .orElseThrow(() -> new ResourceNotFoundException("Agent not found: " + assignationDTO.getAgent().getId()));
 
                             AssignationAgent assignation = new AssignationAgent();
                             assignation.setZone(zone);
-                            assignation.setAgent((AgentInventaire) agent);
+                            assignation.setAgent(agent);
                             assignation.setPlanInventaire(plan);
                             assignation.setDateAssignation(LocalDateTime.now());
                             return assignation;
@@ -96,7 +88,6 @@ public class PlanInventaireService {
 
                 plan.setAssignations(assignations);
             }
-            // Save and return
             PlanInventaire savedPlan = planInventaireRepository.save(plan);
             log.info("Created plan with ID: {}", savedPlan.getId());
             return savedPlan;

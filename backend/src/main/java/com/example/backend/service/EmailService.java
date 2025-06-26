@@ -21,26 +21,6 @@ public class EmailService {
     @Value("${app.frontend.url:http://localhost:5173}")
     private String frontendUrl;
 
-    public void sendVerificationEmail(String to, String token) {
-        logger.info("Préparation de l'email de vérification pour : {}", to);
-        String subject = "Vérification de votre compte";
-        String verificationUrl = frontendUrl + "/verify?token=" + token;
-
-        String htmlContent = "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>"
-                + "<h1 style='color: #1e3a8a; text-align: center;'>Vérification de votre compte</h1>"
-                + "<p>Bonjour,</p>"
-                + "<p>Merci de vous être inscrit. Pour activer votre compte, veuillez cliquer sur le lien ci-dessous :</p>"
-                + "<div style='text-align: center; margin: 20px 0;'>"
-                + "<a href='" + verificationUrl + "' style='background-color: #1e3a8a; color: white; padding: 12px 24px; "
-                + "text-decoration: none; border-radius: 4px;'>Activer mon compte</a>"
-                + "</div>"
-                + "<p style='color: #666;'>Ce lien expirera dans 24 heures.</p>"
-                + "<p style='color: #666;'>Si vous n'avez pas créé de compte, ignorez cet email.</p>"
-                + "</div>";
-
-        sendHtmlEmail(to, subject, htmlContent);
-    }
-
     public void sendPasswordResetEmail(String to, String token) {
         logger.info("Tentative d'envoi d'email de réinitialisation à: {}", to);
         String subject = "Réinitialisation de votre mot de passe";

@@ -20,23 +20,19 @@ public class PlanInventaire {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank(message = "Le nom est obligatoire")
     private String nom;
 
-    @NotNull(message = "La date de début est obligatoire")
     private LocalDateTime dateDebut;
 
     private LocalDateTime dateFin;
 
     @Enumerated(EnumType.STRING)
-    @NotNull(message = "Le type d'inventaire est obligatoire")
     private TYPE type;
 
     @Enumerated(EnumType.STRING)
     private RECCURENCE recurrence;
 
     @Enumerated(EnumType.STRING)
-    @NotNull(message = "Le statut est obligatoire")
     private STATUS statut = STATUS.Indefini;
 
     @ManyToMany(fetch = FetchType.LAZY)

@@ -8,38 +8,23 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import io.swagger.v3.oas.annotations.responses.*;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.MediaType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-import org.thymeleaf.context.Context;
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.extern.slf4j.Slf4j;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 
@@ -64,13 +49,25 @@ public class PlanInventaireController {
     private final AssignationAgentRepository assignationAgentRepository;
     @Autowired
     private final EcartRepository ecartRepository;
+    @Autowired
+    private final CheckupRepository checkupRepository;
 
     @Operation(summary = "Lister tous les plan")
     @ApiResponses(value =
     @ApiResponse(responseCode = "200", description = "lister tous les plans"))
     @GetMapping
-    public ResponseEntity<List<PlanInventaire>> getAllPlans() {
-        return ResponseEntity.ok(planInventaireRepository.findAll());
+    @Transactional
+    public ResponseEntity<List<PlanInventaireDTO>> getAllPlans() {
+        List<PlanInventaire> plans = planInventaireRepository.findAll();
+        plans.forEach(plan -> {
+            plan.getZones().size();
+            plan.getProduits().size();
+            if (plan.getAssignations() != null) plan.getAssignations().size();
+        });
+        List<PlanInventaireDTO> dtos = plans.stream()
+            .map(this::convertToDTO)
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(dtos);
     }
 
     @Operation(summary = "retourner un plan", description = "lister les infos du plan")
@@ -82,7 +79,6 @@ public class PlanInventaireController {
     public ResponseEntity<PlanInventaire> getPlanById(@PathVariable Long planId) {
         return planInventaireRepository.findById(planId)
             .map(plan -> {
-                // Ensure zones are loaded
                 plan.getProduits().forEach(produit -> {
                     if (produit.getZones() == null) {
                         produit.setZones(new ArrayList<>());
@@ -117,11 +113,15 @@ public class PlanInventaireController {
         try {
             PlanInventaire plan = new PlanInventaire();
             plan.setNom((String) requestData.get("nom"));
-            plan.setDateDebut(LocalDateTime.parse((String) requestData.get("dateDebut")));
-            plan.setDateFin(LocalDateTime.parse((String) requestData.get("dateFin")));
+            plan.setDateDebut(parseDateTime((String) requestData.get("dateDebut")));
+            plan.setDateFin(parseDateTime((String) requestData.get("dateFin")));
             plan.setType(TYPE.valueOf((String) requestData.get("type")));
             String recurrenceStr = (String) requestData.get("recurrence");
-            plan.setRecurrence(recurrenceStr != null ? RECCURENCE.valueOf(recurrenceStr) : RECCURENCE.MENSUEL);
+            if (recurrenceStr == null || recurrenceStr.isBlank()) {
+                plan.setRecurrence(RECCURENCE.MENSUEL);
+            } else {
+                plan.setRecurrence(RECCURENCE.valueOf(recurrenceStr));
+            }
 
             String statutStr = (String) requestData.get("statut");
             plan.setStatut(statutStr != null ? STATUS.valueOf(statutStr) : STATUS.Indefini);
@@ -200,7 +200,20 @@ public class PlanInventaireController {
     })
     @DeleteMapping("{planId}")
     public ResponseEntity<?> supprimerPlan(@PathVariable Long planId) {
-        planInventaireRepository.deleteById(planId);
+        PlanInventaire plan = planInventaireRepository.findById(planId)
+                .orElseThrow(() -> new RuntimeException("Plan introuvable"));
+
+        // Supprimer d'abord les checkups liés à ce plan pour éviter les contraintes FK
+        List<Checkup> planCheckups = checkupRepository.findByPlanId(planId);
+        checkupRepository.deleteAll(planCheckups);
+
+        // Supprimer les assignations d'agent liées
+        List<AssignationAgent> assigns = assignationAgentRepository.findByPlanInventaireId(planId);
+        assignationAgentRepository.deleteAll(assigns);
+
+        // On peut maintenant supprimer le plan
+        planInventaireRepository.delete(plan);
+
         return ResponseEntity.ok().build();
     }
     @Operation(summary = "mise a jour du plan", description = "update du plan")
@@ -216,15 +229,15 @@ public class PlanInventaireController {
         PlanInventaire plan = planInventaireRepository.save(planInventaire);
         return ResponseEntity.ok(plan);
     }
-    @Operation(summary = "Enregistrer un nouvel utilisateur", description = "Crée un nouveau compte utilisateur")
+    @Operation(summary = "assigner un agent ", description = "assigner un aplan a un agent")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Utilisateur enregistré avec succès"),
-            @ApiResponse(responseCode = "400", description = "Données d'utilisateur invalides")
+            @ApiResponse(responseCode = "200", description = "agent assigne  avec succès"),
+            @ApiResponse(responseCode = "400", description = "failure d'assignations")
     })
     @PostMapping("{planId}/agents/{agentId}/assignations")
     public ResponseEntity<?> assignerAgents(@PathVariable Long planId,
                                             @PathVariable Long agentId,
-                                            @RequestBody Zone zone,
+                                            @RequestBody(required = false) Zone zone,
                                             Authentication authentication) {
         try {
             Utilisateur user = utilisateurRepository.findByEmail(authentication.getName())
@@ -238,11 +251,6 @@ public class PlanInventaireController {
             PlanInventaire plan = planInventaireRepository.findById(planId)
                     .orElseThrow(() -> new RuntimeException("Plan d'inventaire non trouvé"));
 
-            if (!plan.getZones().contains(zone)) {
-                return ResponseEntity.badRequest()
-                        .body("La zone spécifiée ne fait pas partie de ce plan d'inventaire");
-            }
-
             Utilisateur agent = utilisateurRepository.findById(agentId)
                     .orElseThrow(() -> new RuntimeException("Agent non trouvé"));
 
@@ -251,14 +259,57 @@ public class PlanInventaireController {
                         .body("L'utilisateur assigné doit être un Agent d'inventaire");
             }
 
-            AssignationAgent assignation = new AssignationAgent();
-            assignation.setPlanInventaire(plan);
-            assignation.setAgent((AgentInventaire) agent);
-            assignation.setZone(zone);
-            assignation.setDateAssignation(LocalDateTime.now());
+            List<Zone> zonesToAssign;
+            if (zone == null || zone.getId() == null) {
+                zonesToAssign = new ArrayList<>(plan.getZones());
+            } else {
+                Zone zoneEntity = zoneRepository.findById(zone.getId())
+                        .orElseThrow(() -> new RuntimeException("Zone non trouvée"));
+                if (plan.getZones().stream().noneMatch(z -> z.getId().equals(zoneEntity.getId()))) {
+                    return ResponseEntity.badRequest()
+                            .body("La zone spécifiée ne fait pas partie de ce plan d'inventaire");
+                }
+                zonesToAssign = List.of(zoneEntity);
+            }
 
-            AssignationAgent savedAssignation = assignationAgentRepository.save(assignation);
-            return ResponseEntity.ok(savedAssignation);
+            List<PlanInventaireDTO.AssignationAgentDTO> assignationDTOs = new ArrayList<>();
+
+            for (Zone z : zonesToAssign) {
+                AssignationAgent assignation = new AssignationAgent();
+                assignation.setPlanInventaire(plan);
+                assignation.setAgent((AgentInventaire) agent);
+                assignation.setZone(z);
+                assignation.setDateAssignation(LocalDateTime.now());
+
+                AssignationAgent savedAssignation = assignationAgentRepository.save(assignation);
+
+                PlanInventaireDTO.AssignationAgentDTO assignationDTO = new PlanInventaireDTO.AssignationAgentDTO();
+                assignationDTO.setId(savedAssignation.getId());
+                assignationDTO.setDateAssignation(savedAssignation.getDateAssignation());
+
+                PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
+                zoneDTO.setId(z.getId());
+                zoneDTO.setName(z.getName());
+                assignationDTO.setZone(zoneDTO);
+
+                PlanInventaireDTO.AgentInventaireDTO agentDTO = new PlanInventaireDTO.AgentInventaireDTO();
+                agentDTO.setId(agent.getId());
+                agentDTO.setNom(agent.getNom());
+                agentDTO.setPrenom(agent.getPrenom());
+                agentDTO.setLastName(agent.getNom());
+                agentDTO.setFirstName(agent.getPrenom());
+                agentDTO.setEmail(agent.getEmail());
+                agentDTO.setRole(String.valueOf(agent.getRole()));
+                assignationDTO.setAgent(agentDTO);
+
+                assignationDTOs.add(assignationDTO);
+
+                plan.getAssignations().add(savedAssignation);
+            }
+
+            planInventaireRepository.save(plan);
+
+            return ResponseEntity.ok(assignationDTOs);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -269,8 +320,34 @@ public class PlanInventaireController {
             @ApiResponse(responseCode = "400", description = "erreur")
     })
     @GetMapping("{planId}/assignations")
-    public ResponseEntity<List<AssignationAgent>> getPlanAssignations(@PathVariable Long planId) {
-        return ResponseEntity.ok(assignationAgentRepository.findByPlanInventaireId(planId));
+    public ResponseEntity<List<PlanInventaireDTO.AssignationAgentDTO>> getPlanAssignations(@PathVariable Long planId) {
+        List<AssignationAgent> assignations = assignationAgentRepository.findByPlanInventaireId(planId);
+        List<PlanInventaireDTO.AssignationAgentDTO> dtos = assignations.stream().map(ass -> {
+            PlanInventaireDTO.AssignationAgentDTO dto = new PlanInventaireDTO.AssignationAgentDTO();
+            dto.setId(ass.getId());
+            dto.setDateAssignation(ass.getDateAssignation());
+
+            if (ass.getZone() != null) {
+                PlanInventaireDTO.ZoneDTO z = new PlanInventaireDTO.ZoneDTO();
+                z.setId(ass.getZone().getId());
+                z.setName(ass.getZone().getName());
+                dto.setZone(z);
+            }
+
+            if (ass.getAgent() != null) {
+                PlanInventaireDTO.AgentInventaireDTO a = new PlanInventaireDTO.AgentInventaireDTO();
+                a.setId(ass.getAgent().getId());
+                a.setNom(ass.getAgent().getNom());
+                a.setPrenom(ass.getAgent().getPrenom());
+                a.setLastName(ass.getAgent().getNom());
+                a.setFirstName(ass.getAgent().getPrenom());
+                a.setEmail(ass.getAgent().getEmail());
+                a.setRole(ass.getAgent().getRole() != null ? ass.getAgent().getRole().toString() : null);
+                dto.setAgent(a);
+            }
+            return dto;
+        }).toList();
+        return ResponseEntity.ok(dtos);
     }
 
     @Operation(summary = "lister les zones concernées par le plan")
@@ -433,14 +510,11 @@ public class PlanInventaireController {
             }
 
             updatedProducts.add(produit);
-
-            // Add product to plan if not already present
             if (!plan.getProduits().contains(produit)) {
                 plan.getProduits().add(produit);
             }
         }
 
-        // Batch save operations
         zoneRepository.saveAll(zonesToSave);
         produitRepository.saveAll(updatedProducts);
         planInventaireRepository.save(plan);
@@ -478,7 +552,6 @@ public class PlanInventaireController {
             plan.getProduits().remove(produit);
             planInventaireRepository.save(plan);
 
-            // Si c'était le dernier produit, vérifier si on doit mettre à jour le statut
             if (plan.getProduits().isEmpty()) {
                 plan.setStatut(STATUS.Termine);
                 planInventaireRepository.save(plan);
@@ -551,7 +624,30 @@ public class PlanInventaireController {
                 return ResponseEntity.ok(dto);
             })
             .orElse(ResponseEntity.notFound().build());
-}
+    }
+    @PatchMapping("{planId}")
+    public ResponseEntity<?> patchPlan(@PathVariable Long planId, @RequestBody Map<String, Object> updates) {
+        Optional<PlanInventaire> optionalPlan = planInventaireRepository.findById(planId);
+        if (optionalPlan.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        PlanInventaire plan = optionalPlan.get();
+        if (updates.containsKey("nom")) {
+            plan.setNom((String) updates.get("nom"));
+        }
+        if (updates.containsKey("dateDebut")) {
+            plan.setDateDebut(LocalDateTime.parse((String) updates.get("dateDebut")));
+        }
+        if (updates.containsKey("dateFin")) {
+            plan.setDateFin(LocalDateTime.parse((String) updates.get("dateFin")));
+        }
+        if (updates.containsKey("type")) {
+            plan.setType(TYPE.valueOf((String) updates.get("type")));
+        }
+        // Add more fields as needed
+        planInventaireRepository.save(plan);
+        return ResponseEntity.ok().build();
+    }
 
 private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
     PlanInventaireDTO dto = new PlanInventaireDTO();
@@ -565,67 +661,48 @@ private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
     dto.setInclusTousProduits(plan.isInclusTousProduits());
     dto.setDateCreation(plan.getDateCreation());
 
+
     if (plan.getZones() != null) {
         plan.getZones().forEach(zone -> {
-            if (zone != null) {
-                PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
-                zoneDTO.setId(zone.getId());
-
-                // Map ZoneProduits with null check
-                if (zone.getZoneProduits() != null) {
-                    zone.getZoneProduits().forEach(zoneProduit -> {
-                        if (zoneProduit != null) {
-                            PlanInventaireDTO.ZoneProduitDTO zpDTO = new PlanInventaireDTO.ZoneProduitDTO();
-                            zpDTO.setId(zoneProduit.getId().getProduitId());
-                            zpDTO.setQuantitetheo(zoneProduit.getQuantiteTheorique());
-
-                            // Map Produit in ZoneProduit
-                            if (zoneProduit.getProduit() != null) {
-                                zpDTO.setProduit(convertProduitToDTO(zoneProduit.getProduit()));
-                            }
-
-                            zoneDTO.getZoneProduits().add(zpDTO);
-                        }
-                    });
-                }
-                dto.getZones().add(zoneDTO);
-            }
+            PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
+            zoneDTO.setId(zone.getId());
+            zoneDTO.setName(zone.getName());
+            dto.getZones().add(zoneDTO);
         });
     }
 
-    // Map Produits with null check
     if (plan.getProduits() != null) {
         plan.getProduits().forEach(produit -> {
-            if (produit != null) {
-                dto.getProduits().add(convertProduitToDTO(produit));
-            }
+            dto.getProduits().add(convertProduitToDTO(produit));
         });
     }
+
     if (plan.getAssignations() != null) {
-        plan.getAssignations().forEach(assignation -> {
-            if (assignation != null) {
-                PlanInventaireDTO.AssignationAgentDTO assignationDTO = new PlanInventaireDTO.AssignationAgentDTO();
-                assignationDTO.setId(assignation.getId());
-                assignationDTO.setDateAssignation(assignation.getDateAssignation());
+        plan.getAssignations().forEach(ass -> {
+            PlanInventaireDTO.AssignationAgentDTO aaDTO = new PlanInventaireDTO.AssignationAgentDTO();
+            aaDTO.setId(ass.getId());
+            aaDTO.setDateAssignation(ass.getDateAssignation());
 
-                if (assignation.getZone() != null) {
-                    PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
-                    zoneDTO.setId(assignation.getZone().getId());
-                    assignationDTO.setZone(zoneDTO);
-                }
-
-                if (assignation.getAgent() != null) {
-                    PlanInventaireDTO.AgentDTO agentDTO = new PlanInventaireDTO.AgentDTO();
-                    agentDTO.setId(assignation.getAgent().getId());
-                    agentDTO.setNom(assignation.getAgent().getNom());
-                    agentDTO.setPrenom(assignation.getAgent().getPrenom());
-                    agentDTO.setEmail(assignation.getAgent().getEmail());
-                    agentDTO.setRole(String.valueOf(assignation.getAgent().getRole()));
-                    assignationDTO.setAgent(agentDTO);
-                }
-
-                dto.getAssignations().add(assignationDTO);
+            if (ass.getZone() != null) {
+                PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
+                zoneDTO.setId(ass.getZone().getId());
+                zoneDTO.setName(ass.getZone().getName());
+                aaDTO.setZone(zoneDTO);
             }
+
+            if (ass.getAgent() != null) {
+                PlanInventaireDTO.AgentInventaireDTO agentDTO = new PlanInventaireDTO.AgentInventaireDTO();
+                agentDTO.setId(ass.getAgent().getId());
+                agentDTO.setNom(ass.getAgent().getNom());
+                agentDTO.setPrenom(ass.getAgent().getPrenom());
+                agentDTO.setLastName(ass.getAgent().getNom());
+                agentDTO.setFirstName(ass.getAgent().getPrenom());
+                agentDTO.setEmail(ass.getAgent().getEmail());
+                agentDTO.setRole(ass.getAgent().getRole() != null ? ass.getAgent().getRole().toString() : null);
+                aaDTO.setAgent(agentDTO);
+            }
+
+            dto.getAssignations().add(aaDTO);
         });
     }
 
@@ -635,11 +712,11 @@ private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
         createurDTO.setNom(plan.getCreateur().getNom());
         createurDTO.setPrenom(plan.getCreateur().getPrenom());
         createurDTO.setEmail(plan.getCreateur().getEmail());
-        createurDTO.setRole(String.valueOf(plan.getCreateur().getRole()));
+        createurDTO.setRole(plan.getCreateur().getRole() != null ? plan.getCreateur().getRole().toString() : null);
         createurDTO.setDateCreation(plan.getCreateur().getDateCreation());
+        createurDTO.setDateModification(plan.getCreateur().getDatecremod());
         dto.setCreateur(createurDTO);
     }
-
     return dto;
 }
 
@@ -647,7 +724,6 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
     PlanInventaireDTO.ProduitDTO produitDTO = new PlanInventaireDTO.ProduitDTO();
     produitDTO.setId(produit.getId());
 
-    // Map Category
     if (produit.getCategory() != null) {
         PlanInventaireDTO.CategoryDTO categoryDTO = new PlanInventaireDTO.CategoryDTO();
         categoryDTO.setId(produit.getCategory().getId());
@@ -673,26 +749,26 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
                 .orElseThrow(() -> new EntityNotFoundException("Plan not found with id: " + planId));
 
             Map<Long, List<Map<String, Object>>> zoneProducts = new HashMap<>();
-            
-            // Pour chaque zone du plan
+
             for (Zone zone : plan.getZones()) {
+                List<Produit> zoneProduits = zone.getProduits();
+                // Exclude produits whose zoneProduit link is already verified
+                zoneProduits = zoneProduits.stream()
+                    .filter(prd -> {
+                        return prd.getZoneProduits().stream()
+                            .filter(zp -> zp.getZone().getId().equals(zone.getId()))
+                            .noneMatch(ZoneProduit::isVerified);
+                    })
+                    .toList();
+                
                 List<Map<String, Object>> produits = new ArrayList<>();
                 
-                // Récupérer les produits qui sont à la fois dans la zone ET dans le plan
-                List<Produit> zoneProduits = zone.getProduits();
                 Set<Produit> planProduits = plan.getProduits();
-                
-                // Pour type PARTIEL, ne prendre que les produits qui sont dans le plan
-                List<Produit> produitsToInclude = zoneProduits.stream()
-                    .filter(planProduits::contains)
-                    .collect(Collectors.toList());
-                
-                for (Produit produit : produitsToInclude) {
+                for (Produit produit : zoneProduits.stream().filter(planProduits::contains).toList()) {
                     Map<String, Object> produitMap = new HashMap<>();
                     produitMap.put("id", produit.getId());
                     produitMap.put("nom", produit.getNom());
                     produitMap.put("codeBarre", produit.getCodeBarre());
-                    // Ne pas inclure la quantité si elle n'est pas disponible dans le modèle
                     produitMap.put("quantitetheo", 0);
                     produits.add(produitMap);
                 }
@@ -707,17 +783,26 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
         }
     }
 
-    @Getter
-    @AllArgsConstructor
-    private static class ErrorResponse {
-        private final String error;
-    }
-
     @GetMapping("/createdby/{userId}")
     public ResponseEntity<List<PlanInventaire>> getPlansByCreateur(@PathVariable Long userId) {
         List<PlanInventaire> plans = planInventaireRepository.findByCreateurId(userId);
         return ResponseEntity.ok(plans);
     }
 
+    private LocalDateTime parseDateTime(String input) {
+        if (input == null) {
+            throw new IllegalArgumentException("date null");
+        }
+        DateTimeFormatter[] formatters = new DateTimeFormatter[] {
+            DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm")
+        };
+        for (DateTimeFormatter f : formatters) {
+            try {
+                return LocalDateTime.parse(input, f);
+            } catch (DateTimeParseException ignored) { }
+        }
+        throw new IllegalArgumentException("Format de date invalide: " + input);
+    }
 
 }

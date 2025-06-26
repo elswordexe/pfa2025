@@ -2,7 +2,6 @@ package com.example.backend.service;
 
 import com.example.backend.model.*;
 import com.example.backend.repository.ClientRepository;
-import com.example.backend.repository.EmailVerificationTokenRepository;
 import com.example.backend.repository.UtilisateurRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -14,8 +13,7 @@ import java.util.UUID;
 
 @Service
 public class UtilisateurServiceImpl implements UtilisateurService {
-    @Autowired
-    private EmailVerificationTokenRepository tokenRepository;
+
     @Autowired
     private EmailService emailService;
     
@@ -71,19 +69,6 @@ public class UtilisateurServiceImpl implements UtilisateurService {
         return passwordEncoder.matches(password, utilisateur.getPassword());
     }
 
-    @Override
-    public Utilisateur verifyEmail(String token) {
-        EmailVerificationToken verificationToken = tokenRepository.findByToken(token)
-            .orElseThrow(() -> new RuntimeException("Token invalide"));
-
-        if (verificationToken.getExpiration().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Token expiré");
-        }
-
-        Utilisateur user = verificationToken.getUtilisateur();
-        tokenRepository.delete(verificationToken);
-        return utilisateurRepository.save(user);
-    }
 
     @Override
     public void initiatePasswordReset(String email) {

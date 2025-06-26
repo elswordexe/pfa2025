@@ -22,6 +22,7 @@ import Stack from '@mui/joy/Stack';
 import FormControl from '@mui/joy/FormControl';
 import FormLabel from '@mui/joy/FormLabel';
 import Input from '@mui/joy/Input';
+import Chip from '@mui/joy/Chip';
 
 export default function PlanManagement() {
   const [plans, setPlans] = useState([]);
@@ -35,14 +36,32 @@ export default function PlanManagement() {
   const [logsLoading, setLogsLoading] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editPlanData, setEditPlanData] = useState({ nom: '', dateDebut: '', dateFin: '', type: '' });
+  const [assignations, setAssignations] = useState({}); 
 
   const navigate = useNavigate();
+
+  // Fetch assignments for all plans
+  const fetchAssignationsForPlans = async (plansList) => {
+    const result = {};
+    await Promise.all(
+      plansList.map(async (plan) => {
+        try {
+          const { data } = await axios.get(`http://localhost:8080/api/plans/${plan.id}/assignations`);
+          result[plan.id] = data;
+        } catch {
+          result[plan.id] = [];
+        }
+      })
+    );
+    setAssignations(result);
+  };
 
   const fetchPlans = async () => {
     try {
       const { data } = await axios.get('http://localhost:8080/api/plans');
       const list = Array.isArray(data) ? data : (Array.isArray(data?.content) ? data.content : []);
       setPlans(list);
+      await fetchAssignationsForPlans(list);
     } catch (err) {
       console.error('Erreur de chargement des plans', err);
     }
@@ -85,11 +104,17 @@ export default function PlanManagement() {
     try {
       const { agentId, zoneId } = assignData;
       if (!agentId || !zoneId || !selectedPlan) return;
+      const token = localStorage.getItem('token');
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
       await axios.post(`http://localhost:8080/api/plans/${selectedPlan.id}/agents/${agentId}/assignations`, {
         id: zoneId,
-      });
+      }, { headers: { ...authHeaders, 'Content-Type': 'application/json' } });
       alert('Agent assigné avec succès');
       setAssignModalOpen(false);
+      
+      const { data } = await axios.get(`http://localhost:8080/api/plans/${selectedPlan.id}/assignations`, { headers: authHeaders });
+      setAssignations((prev) => ({ ...prev, [selectedPlan.id]: data }));
     } catch (err) {
       console.error('Erreur assignation', err);
       alert("Erreur lors de l'assignation");
@@ -102,12 +127,11 @@ export default function PlanManagement() {
     setLogsModalOpen(true);
     setLogsLoading(true);
     try {
-      const [scanRes, manuelRes] = await Promise.all([
-        axios.get(`http://localhost:8080/checkups/plan/${plan.id}/type/SCAN`),
-        axios.get(`http://localhost:8080/checkups/plan/${plan.id}/type/MANUEL`),
-      ]);
-      const combined = [...scanRes.data, ...manuelRes.data];
-      setLogs(combined);
+      const token = localStorage.getItem('token');
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const { data } = await axios.get(`http://localhost:8080/checkups/plan/${plan.id}/logs`, { headers: authHeaders });
+      setLogs(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erreur chargement logs', err);
     } finally {
@@ -128,6 +152,7 @@ export default function PlanManagement() {
               <th>Date fin</th>
               <th>Statut</th>
               <th>Type</th>
+              <th>Agents assignés</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -140,6 +165,18 @@ export default function PlanManagement() {
                 <td>{plan.statut}</td>
                 <td>{plan.type}</td>
                 <td>
+                  {(assignations[plan.id] || []).length === 0
+                    ? <span style={{ color: '#aaa' }}>Aucun</span>
+                    : Array.from(
+                        new Set(
+                          (assignations[plan.id] || [])
+                            .filter(a => a.agent)
+                            .map(a => `${a.agent.nom || ''} ${a.agent.prenom || ''}`.trim())
+                        )
+                      ).join(', ')
+                  }
+                </td>
+                <td>
                   <IconButton color="primary" onClick={() => {
                     localStorage.setItem('selectedPlanId', plan.id);
                     navigate('/inventory');
@@ -149,10 +186,14 @@ export default function PlanManagement() {
                   <IconButton color="warning" onClick={() => {
                     setSelectedPlan(plan);
                     setEditPlanData({
-                      nom: plan.nom || '',
+                      ...plan,
                       dateDebut: dayjs(plan.dateDebut).format('YYYY-MM-DDTHH:mm'),
                       dateFin: dayjs(plan.dateFin).format('YYYY-MM-DDTHH:mm'),
-                      type: plan.type || ''
+                      // Ensure statut, produits, zones, assignations, etc. are present
+                      statut: plan.statut || '',
+                      produits: plan.produits || [],
+                      zones: plan.zones || [],
+                      assignations: plan.assignations || [],
                     });
                     setEditModalOpen(true);
                   }}>
@@ -174,7 +215,6 @@ export default function PlanManagement() {
         </Table>
       </Box>
 
-      {/* Modal Assignation */}
       <Modal open={assignModalOpen} onClose={() => setAssignModalOpen(false)}>
         <ModalDialog sx={{ width: 400 }}>
           <Typography level="h4" component="h2" mb={2}>
@@ -187,7 +227,7 @@ export default function PlanManagement() {
             sx={{ mb: 2 }}
           >
             {agents.map((agent) => (
-              <Option key={agent.id} value={agent.id}>{agent.firstName} {agent.lastName}</Option>
+              <Option key={agent.id} value={agent.id}>{agent.nom} {agent.prenom}</Option>
             ))}
           </Select>
           <Select
@@ -207,7 +247,6 @@ export default function PlanManagement() {
         </ModalDialog>
       </Modal>
 
-      {/* Logs Modal */}
       <Modal open={logsModalOpen} onClose={() => setLogsModalOpen(false)}>
         <ModalDialog sx={{ width: 600, maxHeight: '80vh', overflowY: 'auto' }}>
           <Typography level="h4" mb={2}>Logs du plan {selectedPlan?.nom}</Typography>
@@ -221,19 +260,51 @@ export default function PlanManagement() {
                 <tr>
                   <th>Type</th>
                   <th>Date</th>
+                  <th>Produit</th>
                   <th>Agent</th>
-                  <th>Recomptage ?</th>
+                  <th>Scan</th>
+                  <th>Manuel</th>
+                  <th>Recomptage</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => (
-                  <tr key={log.id}>
-                    <td>{log.type}</td>
-                    <td>{new Date(log.dateCheck).toLocaleString()}</td>
-                    <td>{log.agent?.nom} {log.agent?.prenom}</td>
-                    <td>{log.demandeRecomptage ? 'Oui' : 'Non'}</td>
-                  </tr>
-                ))}
+                {logs.map((log) => {
+                  const typeColor = log.type === 'SCAN' ? 'primary' : log.type === 'MANUEL' ? 'warning' : 'neutral';
+                  return (
+                    <tr key={log.id} className="hover:bg-blue-50 transition">
+                      <td>
+                        <Chip size="sm" color={typeColor} variant="soft" startDecorator={log.type === 'SCAN' ? <i className="material-icons">qr_code_scanner</i> : <i className="material-icons">edit</i>}>
+                          {log.type}
+                        </Chip>
+                      </td>
+                      <td>{new Date(log.dateCheck).toLocaleString()}</td>
+                      <td>{
+                        log.details && log.details.length > 0 ? (
+                          (() => {
+                            const prod = log.details[0].produit;
+                            return prod ? `${prod.nom ?? ''} (${prod.codeBarre ?? ''})` : '-';
+                          })()
+                        ) : '-'
+                      }</td>
+                      <td>{log.agent ? `${log.agent.nom ?? ''} ${log.agent.prenom ?? ''}`.trim() : '-'}</td>
+                      <td>{
+                        log.details && log.details.length > 0 ? (
+                          log.details.find(d => d.type === 'SCAN')?.scannedQuantity ?? '-'
+                        ) : '-'
+                      }</td>
+                      <td>{
+                        log.details && log.details.length > 0 ? (
+                          log.details.find(d => d.type === 'MANUEL')?.manualQuantity ?? '-'
+                        ) : '-'
+                      }</td>
+                      <td>
+                        <Chip size="sm" color={log.demandeRecomptage ? 'danger' : 'success'} variant="soft">
+                          {log.demandeRecomptage ? 'Demandé' : 'Non'}
+                        </Chip>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </Table>
           )}
@@ -243,7 +314,6 @@ export default function PlanManagement() {
         </ModalDialog>
       </Modal>
 
-      {/* Edit Plan Modal */}
       <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)}>
         <ModalDialog sx={{ width: 400 }}>
           <Typography level="h4" mb={2}>Modifier le plan</Typography>
@@ -270,11 +340,11 @@ export default function PlanManagement() {
             <Button onClick={()=>setEditModalOpen(false)}>Annuler</Button>
             <Button onClick={async ()=>{
               try{
-                await axios.put(`http://localhost:8080/api/plans/${selectedPlan.id}`,{
-                  nom:editPlanData.nom,
-                  dateDebut:editPlanData.dateDebut,
-                  dateFin:editPlanData.dateFin,
-                  type:editPlanData.type
+                await axios.patch(`http://localhost:8080/api/plans/${selectedPlan.id}`, {
+                  nom: editPlanData.nom,
+                  dateDebut: editPlanData.dateDebut,
+                  dateFin: editPlanData.dateFin,
+                  type: editPlanData.type,
                 });
                 setEditModalOpen(false);
                 fetchPlans();
@@ -288,4 +358,4 @@ export default function PlanManagement() {
       </Modal>
     </Box>
   );
-} 
+}

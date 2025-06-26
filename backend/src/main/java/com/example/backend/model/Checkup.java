@@ -1,7 +1,6 @@
 package com.example.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonView;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,9 +19,7 @@ public class Checkup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @JsonView(Views.Summary.class)
     private Long id;
-    private CheckupType type;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "agent_id")
     @JsonIgnoreProperties({"assignations", "checkups", "hibernateLazyInitializer"})

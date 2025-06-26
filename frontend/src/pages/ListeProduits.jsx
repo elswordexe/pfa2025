@@ -69,11 +69,9 @@ const [showPDF, setShowPDF] = useState(false);
       const products = await response.json();
       
       if (products.length === 0) {
-        await fetch(`http://localhost:8080/api/plans/${planId}`, {
+        await axios.put(`http://localhost:8080/api/plans/${planId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        headers: authHeaders,
           body: JSON.stringify({ statut: 'Termine' })
         });
         setPlanStatus('Terminer');
@@ -126,20 +124,21 @@ const [showPDF, setShowPDF] = useState(false);
 
   const handleDeleteConfirm = async () => {
     try {
-      const response = await axios.delete(`http://localhost:8080/produits/${productToDelete.id}`, {
-        method: 'DELETE',
-        headers: authHeaders
-      });
+      const { status } = await axios.delete(
+        `http://localhost:8080/produits/${productToDelete.id}`,
+        { headers: authHeaders }
+      );
 
-      if (!response.ok) throw new Error('Failed to delete Product');
+      if (status !== 200 && status !== 204) {
+        throw new Error('Échec de la suppression du produit');
+      }
 
-      setProducts(products.filter(p => p.id !== productToDelete.id));
+      setProducts(prev => prev.filter(p => p.id !== productToDelete.id));
       setDeleteModalOpen(false);
       setProductToDelete(null);
-      
     } catch (error) {
       console.error('Delete error:', error);
-      setDeleteError(error.message);
+      setDeleteError(error.message || 'Erreur lors de la suppression');
     }
   };
 
@@ -159,30 +158,22 @@ const [showPDF, setShowPDF] = useState(false);
 
   const handleEditSubmit = async () => {
     try {
-      const response = await axios.put(`http://localhost:8080/produits/${editingProduct.id}`, {
-        method: 'PUT',
-         headers: authHeaders,
-        body: JSON.stringify(editingProduct)
-      });
+      const response = await axios.put(
+        `http://localhost:8080/produits/${editingProduct.id}`,
+        editingProduct,
+        { headers: authHeaders }
+      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Erreur lors de la modification');
-      }
-
-      const updatedProduct = await response.json();
-      
+      const updatedProduct = response.data;
       setProducts(products.map(p => 
         p.id === updatedProduct.id ? updatedProduct : p
       ));
-      
       setEditModalOpen(false);
       setEditingProduct(null);
       setEditError(null);
-      
     } catch (error) {
       console.error('Edit error:', error);
-      setEditError(error.message);
+      setEditError(error.response?.data?.message || error.message || 'Erreur lors de la modification');
     }
   };
 
@@ -232,7 +223,7 @@ const [showPDF, setShowPDF] = useState(false);
   <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center p-4 z-50">
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden">
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5">
-        <h3 className="text-xl font-semibold text-white flex items-center">
+        <h3 className="text-xl font-semibold text-white flex items-center gap-2">
           <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
@@ -316,8 +307,6 @@ const [showPDF, setShowPDF] = useState(false);
                   </FormControl>
                 </div>
               </div>
-
-              {/* Table Content */}
               <div className="p-6">
                 {loading ? (
                   <div className="flex justify-center items-center h-64">
@@ -343,6 +332,7 @@ const [showPDF, setShowPDF] = useState(false);
                     >
                       <thead>
                         <tr>
+                          <th style={{ width: '10%' }}>Image</th>
                           <th style={{ width: '20%' }}>Nom</th>
                           <th style={{ width: '20%' }}>Description</th>
                           <th style={{ width: '10%' }}>Code Barre</th>
@@ -357,16 +347,12 @@ const [showPDF, setShowPDF] = useState(false);
                       <tbody>
                         {products
                           .filter(product => {
-                            // Apply category filters
                             const categoryMatch = !selectedCategory || product.category?.id === selectedCategory;
                             const subCategoryMatch = !selectedSubCategory || product.subCategory?.id === selectedSubCategory;
-                            
-                            // Apply search filter
                             const searchMatch = !searchQuery || 
                               product.nom?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               product.codeBarre?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               product.reference?.toLowerCase().includes(searchQuery.toLowerCase());
-                            
                             return categoryMatch && subCategoryMatch && searchMatch;
                           })
                           .map((product) => (
@@ -377,6 +363,15 @@ const [showPDF, setShowPDF] = useState(false);
                                 transition: 'background-color 0.3s'
                               }}
                             >
+                              <td>
+                                {product.imageUrl ? (
+                                  <img src={product.imageUrl} alt={product.nom} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8 }} />
+                                ) : (
+                                  <div style={{ width: 48, height: 48, background: '#f3f4f6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bdbdbd', fontSize: 24 }}>
+                                    <span role="img" aria-label="no image">🖼️</span>
+                                  </div>
+                                )}
+                              </td>
                               <td>{product.nom}</td>
                               <td>{product.description}</td>
                               <td>{product.codeBarre}</td>

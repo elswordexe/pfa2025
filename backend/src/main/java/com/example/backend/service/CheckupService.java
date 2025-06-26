@@ -44,19 +44,24 @@ public class CheckupService {
         checkup.setAgent(agent);
         checkup.setPlan(plan);
         checkup.setDateCheck(LocalDateTime.now());
-        for(CheckupDetail detail: checkup.getDetails() ) {
-            detail.setProduit(produit);
-            detail.setCheckup(checkup);
-            detail.setScannedQuantity(1);
-        }
-        checkup.setType(CheckupType.SCAN);
         checkup.setValide(false);
+        CheckupDetail detail = new CheckupDetail();
+        detail.setProduit(produit);
+        detail.setCheckup(checkup);
+        detail.setScannedQuantity(1);
+        detail.setType(CheckupType.SCAN);
+        checkup.getDetails().add(detail);
 
         checkupRepository.save(checkup);
     }
 
     public List<Checkup> findByPlanAndType(Long planId, CheckupType type) {
-        return checkupRepository.findByPlanIdAndType(planId, type);
+        List<Checkup> allCheckups = checkupRepository.findByPlanId(planId);
+        // Only keep checkups that have at least one detail of the requested type
+        return allCheckups.stream()
+            .filter(checkup -> checkup.getDetails() != null &&
+                checkup.getDetails().stream().anyMatch(detail -> detail.getType() == type))
+            .toList();
     }
 
 }

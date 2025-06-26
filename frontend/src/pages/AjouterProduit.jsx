@@ -20,11 +20,18 @@ const AjouterProduit = () => {
     categorieId: '',
     sousCategorieId: ''
   });
+  const [imageFile, setImageFile] = useState(null);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newSubCategoryName, setNewSubCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [creatingSubCategory, setCreatingSubCategory] = useState(false);
 
   const [categories, setCategories] = useState([]);
   const [sousCategories, setSousCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const token = localStorage.getItem('token');
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -32,13 +39,10 @@ const AjouterProduit = () => {
         setLoading(true);
         const { data } = await axios.get('http://localhost:8080/api/categories');
         
-        // Validate the data structure
         if (!Array.isArray(data)) {
           console.error('Received data:', data);
           throw new Error('Les données reçues ne sont pas un tableau');
         }
-
-        // Validate each category object
         const validCategories = data.every(category => 
           category && 
           typeof category === 'object' &&
@@ -64,8 +68,6 @@ const AjouterProduit = () => {
 
     fetchCategories();
   }, []);
-
-  // 1. Update the fetchSousCategories function to handle null/undefined categoryId
   const fetchSousCategories = async (categorieId) => {
     if (!categorieId) {
       setSousCategories([]);
@@ -81,12 +83,49 @@ const AjouterProduit = () => {
     }
   };
 
+  const handleImageChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
+
+  const uploadProductImage = async (produitId) => {
+    if (!imageFile) return;
+    const formData = new FormData();
+    formData.append('image', imageFile);
+    try {
+      await axios.post(`http://localhost:8080/produits/${produitId}/image`, formData, {
+        headers: {
+          ...headers,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'upload de l\'image:', error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const { status } = await axios.post('http://localhost:8080/produits', product);
-      if (status === 200 || status === 201) {
+      const payload = {
+        nom: product.nom,
+        description: product.description,
+        CodeBarre: product.codeBarre,
+        quantiteTheorique: product.quantiteTheorique,
+        category: product.categorieId ? { id: product.categorieId } : undefined,
+        subCategory: product.sousCategorieId ? { id: product.sousCategorieId } : undefined,
+      };
+      const { data, status } = await axios.post(
+        'http://localhost:8080/produits/register',
+        payload,
+        { headers }
+      );
+      if ((status === 200 || status === 201) && data.id) {
+        if (imageFile) {
+          await uploadProductImage(data.id);
+        }
         alert('Produit ajouté avec succès');
         setProduct({
           nom: '',
@@ -96,6 +135,7 @@ const AjouterProduit = () => {
           categorieId: '',
           sousCategorieId: ''
         });
+        setImageFile(null);
       }
     } catch (error) {
       console.error('Error adding product:', error);
@@ -103,9 +143,8 @@ const AjouterProduit = () => {
       setLoading(false);
     }
   };
-  // Update the handleFileImport function to handle the new structure
 
-const handleFileImport = async (file) => {
+  const handleFileImport = async (file) => {
     if (!file) return;
     setImportStatus({ loading: true, error: '', success: '' });
 
@@ -123,11 +162,8 @@ const handleFileImport = async (file) => {
             loading: false,
             success: `${response.data.length} produits importés avec succès`
         });
-
-        // Refresh product list and close modal
         setTimeout(() => {
             setShowImportModal(false);
-            // Refresh your product list here if needed
         }, 2000);
 
     } catch (error) {
@@ -137,7 +173,51 @@ const handleFileImport = async (file) => {
             error: error.response?.data || 'Erreur lors de l\'import'
         });
     }
-};
+  };
+
+  const handleCSVImport = async (file) => {
+    if (!file) return;
+    setImportStatus({ loading: true, error: '', success: '' });
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await axios.post('http://localhost:8080/produits/import/csv', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImportStatus({
+        loading: false,
+        success: `${response.data.count || 0} produits importés avec succès`
+      });
+      setTimeout(() => setShowImportModal(false), 2000);
+    } catch (error) {
+      setImportStatus({
+        loading: false,
+        error: error.response?.data?.message || 'Erreur lors de l\'import CSV'
+      });
+    }
+  };
+
+  const handleExcelImport = async (file) => {
+    if (!file) return;
+    setImportStatus({ loading: true, error: '', success: '' });
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await axios.post('http://localhost:8080/produits/import/excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setImportStatus({
+        loading: false,
+        success: `${response.data.count || 0} produits importés avec succès`
+      });
+      setTimeout(() => setShowImportModal(false), 2000);
+    } catch (error) {
+      setImportStatus({
+        loading: false,
+        error: error.response?.data?.message || 'Erreur lors de l\'import Excel'
+      });
+    }
+  };
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -158,6 +238,38 @@ const handleFileImport = async (file) => {
       handleFileImport(e.dataTransfer.files[0]);
     }
   };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setCreatingCategory(true);
+    try {
+      const { data } = await axios.post('http://localhost:8080/api/categories', { name: newCategoryName }, { headers });
+      setCategories(prev => [...prev, data]);
+      setProduct({ ...product, categorieId: data.id, sousCategorieId: '' });
+      setNewCategoryName("");
+      fetchSousCategories(data.id);
+    } catch (error) {
+      alert("Erreur lors de la création de la catégorie");
+    } finally {
+      setCreatingCategory(false);
+    }
+  };
+
+  const handleCreateSubCategory = async () => {
+    if (!newSubCategoryName.trim() || !product.categorieId) return;
+    setCreatingSubCategory(true);
+    try {
+      const { data } = await axios.post(`http://localhost:8080/api/categories/${product.categorieId}/sous-categories`, { name: newSubCategoryName }, { headers });
+      setSousCategories(prev => [...prev, data]);
+      setProduct({ ...product, sousCategorieId: data.id });
+      setNewSubCategoryName("");
+    } catch (error) {
+      alert("Erreur lors de la création de la sous-catégorie");
+    } finally {
+      setCreatingSubCategory(false);
+    }
+  };
+
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       <Sidebarsuper />
@@ -206,7 +318,14 @@ const handleFileImport = async (file) => {
                     onChange={(e) => setProduct({...product, nom: e.target.value})}
                   />
                 </FormControl>
-
+                <FormControl>
+                  <FormLabel>Image du produit</FormLabel>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                  />
+                </FormControl>
                 <FormControl required>
                   <FormLabel>Code barre</FormLabel>
                   <Input
@@ -221,23 +340,41 @@ const handleFileImport = async (file) => {
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <FormControl required sx={{ flex: 1 }}>
                     <FormLabel>Catégorie</FormLabel>
-                    <Select
-                      placeholder="Sélectionnez une catégorie"
-                      color="primary"
-                      variant="soft"
-                      size="lg"
-                      value={product.categorieId}
-                      onChange={(_, value) => {
-                        setProduct({...product, categorieId: value, sousCategorieId: ''});
-                        fetchSousCategories(value);
-                      }}
-                    >
-                      {categories.map((cat) => (
-                        <Option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </Option>
-                      ))}
-                    </Select>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Select
+                        placeholder="Sélectionnez une catégorie"
+                        color="primary"
+                        variant="soft"
+                        size="lg"
+                        value={product.categorieId}
+                        onChange={(_, value) => {
+                          setProduct({ ...product, categorieId: value, sousCategorieId: '' });
+                          fetchSousCategories(value);
+                        }}
+                        sx={{ flex: 1 }}
+                      >
+                        {categories.map((cat) => (
+                          <Option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </Option>
+                        ))}
+                      </Select>
+                      <Input
+                        placeholder="Nouvelle catégorie"
+                        value={newCategoryName}
+                        onChange={e => setNewCategoryName(e.target.value)}
+                        sx={{ minWidth: 120 }}
+                        size="sm"
+                      />
+                      <Button
+                        size="sm"
+                        loading={creatingCategory}
+                        onClick={handleCreateCategory}
+                        disabled={!newCategoryName.trim()}
+                      >
+                        +
+                      </Button>
+                    </Box>
                   </FormControl>
 
                   <FormControl sx={{ flex: 1 }}>
@@ -254,17 +391,35 @@ const handleFileImport = async (file) => {
                 {product.categorieId && (
                   <FormControl>
                     <FormLabel>Sous-catégorie</FormLabel>
-                    <Select
-                      value={product.sousCategorieId || ''}
-                      onChange={(_, value) => setProduct({...product, sousCategorieId: value})}
-                      required
-                    >
-                      {Array.isArray(sousCategories) && sousCategories.map((scat) => (
-                        <Option key={scat.id} value={scat.id}>
-                          {scat.name}
-                        </Option>
-                      ))}
-                    </Select>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Select
+                        value={product.sousCategorieId || ''}
+                        onChange={(_, value) => setProduct({ ...product, sousCategorieId: value })}
+                        required
+                        sx={{ flex: 1 }}
+                      >
+                        {Array.isArray(sousCategories) && sousCategories.map((scat) => (
+                          <Option key={scat.id} value={scat.id}>
+                            {scat.name}
+                          </Option>
+                        ))}
+                      </Select>
+                      <Input
+                        placeholder="Nouvelle sous-catégorie"
+                        value={newSubCategoryName}
+                        onChange={e => setNewSubCategoryName(e.target.value)}
+                        sx={{ minWidth: 120 }}
+                        size="sm"
+                      />
+                      <Button
+                        size="sm"
+                        loading={creatingSubCategory}
+                        onClick={handleCreateSubCategory}
+                        disabled={!newSubCategoryName.trim()}
+                      >
+                        +
+                      </Button>
+                    </Box>
                   </FormControl>
                 )}
 
@@ -344,7 +499,16 @@ const handleFileImport = async (file) => {
       <input
         type="file"
         accept=".xlsx,.csv,.json"
-        onChange={(e) => handleFileImport(e.target.files[0])}
+        onChange={(e) => {
+          const file = e.target.files[0];
+          if (file && file.name.endsWith('.csv')) {
+            handleCSVImport(file);
+          } else if (file && file.name.endsWith('.json')) {
+            handleFileImport(file);
+          } else if (file && (file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+            handleExcelImport(file);
+          }
+        }}
         style={{ display: 'none' }}
         id="file-upload"
       />

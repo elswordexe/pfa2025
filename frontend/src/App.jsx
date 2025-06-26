@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Login } from "./pages/Login";
-import Dash from "./components/Dash";
+import Dash from "./pages/Dash";
 import UserManagement from "./pages/UserManagement";
 import "./app.css"; 
 import InventairePlan from "./pages/InventairePlan";
@@ -12,9 +12,8 @@ import ListeProduits from './pages/ListeProduits';
 import Analytics from './pages/Analytics';
 import AuthForm from './components/AuthForm';
 import ZoneManagement from './pages/ZoneManagement';
-import ClientManagement from './pages/ClientManagement';
 import PlanManagement from './pages/PlanManagement';
-import Dashboardsuperadmin from './components/DashSuper';
+import Dashboardsuperadmin from './pages/DashSuper';
 import { useEffect } from 'react';
 import { getRoleFromToken, isTokenExpired } from './utils/auth';
 

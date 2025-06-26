@@ -48,6 +48,9 @@ public class Produit {
     @JsonIgnoreProperties({"zones", "produits", "assignations", "createur"})
     private List<PlanInventaire> plans = new ArrayList<>();
     @OneToMany(mappedBy = "produit", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties({"produit"})
+    private List<Image> images = new ArrayList<>();
+    @OneToMany(mappedBy = "produit", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties({"produit", "zone"})
     private Set<ZoneProduit> zoneProduits = new HashSet<>();
 }

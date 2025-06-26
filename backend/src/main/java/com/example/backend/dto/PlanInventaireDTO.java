@@ -2,6 +2,7 @@ package com.example.backend.dto;
 
 import com.example.backend.model.Category;
 import com.example.backend.model.SubCategory;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -22,13 +23,13 @@ public class PlanInventaireDTO {
     private Boolean inclusTousProduits;
     private List<ZoneDTO> zones = new ArrayList<>();
     private List<ProduitDTO> produits = new ArrayList<>();
-    private List<AssignationAgentDTO> assignations = new ArrayList<>();
     private LocalDateTime dateCreation;
     private UtilisateurDTO createur;
-
+    private List<AssignationAgentDTO> assignations = new ArrayList<>();
     @Data
     @NoArgsConstructor
     public static class ZoneDTO {
+        private String name;
         private Long id;
         private List<ZoneProduitDTO> zoneProduits = new ArrayList<>();
     }
@@ -61,16 +62,18 @@ public class PlanInventaireDTO {
     public static class AssignationAgentDTO {
         private Long id;
         private ZoneDTO zone;
-        private AgentDTO agent;
+        private AgentInventaireDTO agent;
         private LocalDateTime dateAssignation;
     }
 
     @Data
     @NoArgsConstructor
-    public static class AgentDTO {
+    public static class AgentInventaireDTO {
         private Long id;
         private String nom;
         private String prenom;
+        private String firstName;
+        private String lastName;
         private String email;
         private String role;
     }

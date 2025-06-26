@@ -38,4 +38,12 @@ public class Zone {
     @JsonIgnoreProperties({"zone", "produit"})
     private Set<ZoneProduit> zoneProduits = new HashSet<>();
 
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties({"zone", "planInventaire", "agent"})
+    private List<AssignationAgent> assignations = new ArrayList<>();
+
+    @OneToMany(mappedBy = "zone", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties({"zone", "produit", "checkup"})
+    private List<CheckupDetail> checkupDetails = new ArrayList<>();
+
 }

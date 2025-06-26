@@ -177,11 +177,12 @@ public class ProduitController {
     })
     @DeleteMapping("/{produitId}")
     public ResponseEntity<?> deleteProduit(@PathVariable Long produitId){
-        if (!produitRepository.existsById(produitId)) {
-            return ResponseEntity.notFound().build();
-        }
-        produitRepository.deleteById(produitId);
-        return ResponseEntity.ok().build();
+        return produitRepository.findById(produitId)
+            .map(produit -> {
+                produitRepository.delete(produit);
+                return ResponseEntity.ok().build();
+            })
+            .orElse(ResponseEntity.notFound().build());
     }
 
     @Operation(
@@ -340,7 +341,8 @@ public class ProduitController {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(List.of());
     }
-} @Operation(summary = "importer les donnes des produits sous format Excel")
+}
+@Operation(summary = "importer les donnes des produits sous format Excel")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "importé avec succès"),
             @ApiResponse(responseCode = "404", description = "importation échoué")
@@ -508,6 +510,15 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
             dto.setSubCategory(subCategoryDTO);
         }
 
+        if (produit.getZones() != null) {
+            produit.getZones().forEach(z -> {
+                ProduitDTO.ZoneDTO zDto = new ProduitDTO.ZoneDTO();
+                zDto.setId(z.getId());
+                zDto.setName(z.getName());
+                dto.getZones().add(zDto);
+            });
+        }
+
         return dto;
     }
 
@@ -611,6 +622,10 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
                     .body(Map.of("error", "ZoneProduit non trouvé pour ce produit et cette zone"));
             }
             targetZp.setQuantiteTheorique(newQuantity);
+
+            if ("VERIFIE".equalsIgnoreCase(status)) {
+                targetZp.setVerified(true);
+            }
 
             int totalQuantite = produit.getZoneProduits().stream()
                     .map(ZoneProduit::getQuantiteTheorique)
