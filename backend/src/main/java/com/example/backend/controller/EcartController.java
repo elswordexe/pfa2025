@@ -24,13 +24,10 @@ public class EcartController {
     private PlanInventaireRepository planInventaireRepository;
     @Autowired
     private EcartRepository ecartRepository;
-    
     @Autowired
     private PlanInventaireRepository planRepository;
-
     @Autowired
     private EcartService ecartService;
-
     @PostMapping("/generate/{planId}")
     public ResponseEntity<?> generateEcarts(@PathVariable Long planId) {
         try {

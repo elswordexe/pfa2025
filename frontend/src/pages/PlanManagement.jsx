@@ -121,6 +121,46 @@ export default function PlanManagement() {
     }
   };
 
+  // Ajouter cette fonction pour regrouper les logs
+  const groupLogs = (logs) => {
+    const groupedMap = new Map();
+
+    logs.forEach(log => {
+      if (!log.details || log.details.length === 0) return;
+
+      const detail = log.details[0];
+      if (!detail.produit || !detail.zone) return;
+
+      // Utiliser une clé qui identifie uniquement le checkup et le produit
+      const key = `${detail.produit.id}_${detail.zone.id}_${new Date(log.dateCheck).getTime()}`;
+      
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          id: log.id,
+          dateCheck: log.dateCheck,
+          agent: log.agent,
+          produit: detail.produit,
+          zone: detail.zone,
+          demandeRecomptage: log.demandeRecomptage,
+          scannedQuantity: null,
+          manualQuantity: null,
+          justificationRecomptage: log.justificationRecomptage
+        });
+      }
+
+      const groupedLog = groupedMap.get(key);
+      if (detail.scannedQuantity !== null && detail.scannedQuantity !== undefined) {
+        groupedLog.scannedQuantity = detail.scannedQuantity;
+      }
+      if (detail.manualQuantity !== null && detail.manualQuantity !== undefined) {
+        groupedLog.manualQuantity = detail.manualQuantity;
+      }
+    });
+
+    return Array.from(groupedMap.values())
+      .sort((a, b) => new Date(b.dateCheck) - new Date(a.dateCheck));
+  };
+
   const openLogsModal = async (plan) => {
     setSelectedPlan(plan);
     setLogs([]);
@@ -129,9 +169,8 @@ export default function PlanManagement() {
     try {
       const token = localStorage.getItem('token');
       const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
-
       const { data } = await axios.get(`http://localhost:8080/checkups/plan/${plan.id}/logs`, { headers: authHeaders });
-      setLogs(Array.isArray(data) ? data : []);
+      setLogs(groupLogs(Array.isArray(data) ? data : []));
     } catch (err) {
       console.error('Erreur chargement logs', err);
     } finally {
@@ -248,8 +287,8 @@ export default function PlanManagement() {
       </Modal>
 
       <Modal open={logsModalOpen} onClose={() => setLogsModalOpen(false)}>
-        <ModalDialog sx={{ width: 600, maxHeight: '80vh', overflowY: 'auto' }}>
-          <Typography level="h4" mb={2}>Logs du plan {selectedPlan?.nom}</Typography>
+        <ModalDialog sx={{ width: 800, maxHeight: '80vh', overflowY: 'auto' }}>
+          <Typography level="h4" mb={2}>Historique du plan {selectedPlan?.nom}</Typography>
           {logsLoading ? (
             <Typography>Chargement...</Typography>
           ) : logs.length === 0 ? (
@@ -258,53 +297,109 @@ export default function PlanManagement() {
             <Table hoverRow variant="outlined" borderAxis="both">
               <thead>
                 <tr>
-                  <th>Type</th>
                   <th>Date</th>
-                  <th>Produit</th>
                   <th>Agent</th>
-                  <th>Scan</th>
-                  <th>Manuel</th>
-                  <th>Recomptage</th>
+                  <th>Produit</th>
+                  <th>Zone</th>
+                  <th style={{ textAlign: 'center' }}>
+                    <i className="material-icons" style={{fontSize: '16px', marginRight: '4px'}}>qr_code_scanner</i>
+                    Scan
+                  </th>
+                  <th style={{ textAlign: 'center' }}>
+                    <i className="material-icons" style={{fontSize: '16px', marginRight: '4px'}}>edit</i>
+                    Manuel
+                  </th>
+                  <th>État</th>
                 </tr>
               </thead>
               <tbody>
-                {logs.map((log) => {
-                  const typeColor = log.type === 'SCAN' ? 'primary' : log.type === 'MANUEL' ? 'warning' : 'neutral';
-                  return (
-                    <tr key={log.id} className="hover:bg-blue-50 transition">
-                      <td>
-                        <Chip size="sm" color={typeColor} variant="soft" startDecorator={log.type === 'SCAN' ? <i className="material-icons">qr_code_scanner</i> : <i className="material-icons">edit</i>}>
-                          {log.type}
+                {logs.map((log) => (
+                  <tr key={`${log.id}_${log.produit.id}_${log.zone.id}`} className="hover:bg-blue-50 transition">
+                    <td>{new Date(log.dateCheck).toLocaleString()}</td>
+                    <td>
+                      {log.agent ? (
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color="primary"
+                        >
+                          {`${log.agent.nom || ''} ${log.agent.prenom || ''}`.trim()}
                         </Chip>
-                      </td>
-                      <td>{new Date(log.dateCheck).toLocaleString()}</td>
-                      <td>{
-                        log.details && log.details.length > 0 ? (
-                          (() => {
-                            const prod = log.details[0].produit;
-                            return prod ? `${prod.nom ?? ''} (${prod.codeBarre ?? ''})` : '-';
-                          })()
-                        ) : '-'
-                      }</td>
-                      <td>{log.agent ? `${log.agent.nom ?? ''} ${log.agent.prenom ?? ''}`.trim() : '-'}</td>
-                      <td>{
-                        log.details && log.details.length > 0 ? (
-                          log.details.find(d => d.type === 'SCAN')?.scannedQuantity ?? '-'
-                        ) : '-'
-                      }</td>
-                      <td>{
-                        log.details && log.details.length > 0 ? (
-                          log.details.find(d => d.type === 'MANUEL')?.manualQuantity ?? '-'
-                        ) : '-'
-                      }</td>
-                      <td>
-                        <Chip size="sm" color={log.demandeRecomptage ? 'danger' : 'success'} variant="soft">
-                          {log.demandeRecomptage ? 'Demandé' : 'Non'}
+                      ) : '-'}
+                    </td>
+                    <td>
+                      {log.produit ? (
+                        <Stack spacing={1}>
+                          <Typography level="body-sm">{log.produit.nom || '-'}</Typography>
+                          <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+                            {log.produit.codeBarre || '-'}
+                          </Typography>
+                        </Stack>
+                      ) : '-'}
+                    </td>
+                    <td>
+                      {log.zone ? (
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color="neutral"
+                        >
+                          {log.zone.name || '-'}
                         </Chip>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      ) : '-'}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {log.scannedQuantity !== null && log.scannedQuantity !== undefined ? (
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color="success"
+                        >
+                          {log.scannedQuantity}
+                        </Chip>
+                      ) : '-'}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      {log.manualQuantity !== null && log.manualQuantity !== undefined ? (
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color="warning"
+                        >
+                          {log.manualQuantity}
+                        </Chip>
+                      ) : '-'}
+                    </td>
+                    <td>
+                      {log.demandeRecomptage ? (
+                        <Stack spacing={1}>
+                          <Chip
+                            size="sm"
+                            color="danger"
+                            variant="soft"
+                            startDecorator={<i className="material-icons">refresh</i>}
+                          >
+                            Recomptage demandé
+                          </Chip>
+                          {log.justificationRecomptage && (
+                            <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+                              Justification: {log.justificationRecomptage}
+                            </Typography>
+                          )}
+                        </Stack>
+                      ) : (
+                        <Chip
+                          size="sm"
+                          color="success"
+                          variant="soft"
+                          startDecorator={<i className="material-icons">check</i>}
+                        >
+                          Validé
+                        </Chip>
+                      )}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </Table>
           )}

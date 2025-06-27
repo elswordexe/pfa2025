@@ -113,7 +113,6 @@ const styles = StyleSheet.create({
 });
 
 const ProductListPDF = ({ products, categories }) => {
-  // Group products by category
   const groupedProducts = products.reduce((acc, product) => {
     const categoryId = product.category?.id || 'uncategorized';
     if (!acc[categoryId]) {
@@ -123,7 +122,6 @@ const ProductListPDF = ({ products, categories }) => {
     return acc;
   }, {});
 
-  // Calculate statistics
   const stats = {
     total: products.length,
     lowStock: products.filter(p => p.quantitetheo <= 10).length,

@@ -38,6 +38,32 @@ public interface PlanInventaireRepository extends JpaRepository<PlanInventaire, 
     @Query("SELECT MAX(p.dateCreation) FROM PlanInventaire p JOIN p.produits prod WHERE prod.id = :productId")
     LocalDateTime findLastInventoryDateForProduct(@Param("productId") Long productId);
 
-    // Fetch plans created by a given user id
     List<PlanInventaire> findByCreateurId(Long userId);
+
+    @Query("SELECT DISTINCT p FROM PlanInventaire p " +
+           "LEFT JOIN FETCH p.zones " +
+           "LEFT JOIN FETCH p.produits " +
+           "LEFT JOIN FETCH p.createur " +
+           "LEFT JOIN FETCH p.assignations a " +
+           "LEFT JOIN FETCH a.agent " +
+           "LEFT JOIN FETCH a.zone")
+    List<PlanInventaire> findAllWithDetails();
+
+    @Query("SELECT p FROM PlanInventaire p WHERE p.dateCreation BETWEEN :startDate AND :endDate")
+    List<PlanInventaire> findByDateCreationBetween(
+        @Param("startDate") LocalDateTime startDate,
+        @Param("endDate") LocalDateTime endDate
+    );
+
+    @Query("SELECT AVG(TIMESTAMPDIFF(HOUR, p.dateDebut, p.dateFin)) FROM PlanInventaire p WHERE p.statut = 'Termine'")
+    Double getAverageCompletionTimeInHours();
+
+    @Query("SELECT COUNT(p) FROM PlanInventaire p WHERE p.dateCreation >= :startDate")
+    long countPlansCreatedSince(@Param("startDate") LocalDateTime startDate);
+
+    @Query("SELECT p.statut as statut, COUNT(p) as count FROM PlanInventaire p GROUP BY p.statut")
+    List<Object[]> countByStatutGrouped();
+
+    @Query("SELECT MONTH(p.dateCreation) as month, COUNT(p) as count FROM PlanInventaire p WHERE YEAR(p.dateCreation) = :year GROUP BY MONTH(p.dateCreation)")
+    List<Object[]> countByMonth(@Param("year") int year);
 }

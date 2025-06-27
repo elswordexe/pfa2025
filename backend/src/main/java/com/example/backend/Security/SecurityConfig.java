@@ -73,7 +73,7 @@ public class SecurityConfig {
                         //plans
                         .requestMatchers(HttpMethod.GET,"/api/plans","/api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")
                         .requestMatchers(HttpMethod.GET, "/api/plans/{planId}/produits","/api/plans/{planId}/details","/api/plans/{planId}/zone-products","/api/plans/createdby/{userId}","/api/plans/createdby/me").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
-                        .requestMatchers(HttpMethod.POST, "/api/plans","/api/plans/{planId}/zones","/api/plans/{planId}/produits","/api/plans/{planId}/agents/{agentId}","/api/plans/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
+                        .requestMatchers(HttpMethod.POST, "/api/plans","/api/plans/{planId}/zones","/api/plans/{planId}/produits","/api/plans/{planId}/agents/{agentId}","/api/plans/{planId}/agents/{agentId}/assignations").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "ROLE_ADMIN_CLIENT")
                         .requestMatchers(HttpMethod.PUT, "api/plans/{planId}/statut","api/plans/{planId}").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT")
                         // Zone manage
                         .requestMatchers(HttpMethod.GET, "/Zone/all","/Zones/{zoneId}/products","/Zone/count").hasAnyAuthority("SUPER_ADMIN", "ADMIN_CLIENT", "AGENT_INVENTAIRE")

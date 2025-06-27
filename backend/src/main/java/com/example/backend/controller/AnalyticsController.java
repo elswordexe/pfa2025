@@ -1,140 +1,173 @@
 package com.example.backend.controller;
 
 import com.example.backend.model.*;
-import com.example.backend.repository.EcartRepository;
-import com.example.backend.repository.PlanInventaireRepository;
-import com.example.backend.repository.ProduitRepository;
-import com.example.backend.repository.ZoneRepository;
-import org.springframework.web.bind.annotation.*;
+import com.example.backend.repository.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import java.util.*;
+import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.*;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/analytics")
 @CrossOrigin(origins = "*")
+@Tag(name = "Analytics", description = "API pour les statistiques et analyses")
+@Slf4j
 public class AnalyticsController {
+
     @Autowired
-    private ProduitRepository produitRepository;
+    private PlanInventaireRepository planInventaireRepository;
+    
     @Autowired
-    private PlanInventaireRepository planRepository;
-    @Autowired
-    private ZoneRepository zoneRepository;
+    private CheckupRepository checkupRepository;
+    
     @Autowired
     private EcartRepository ecartRepository;
 
-    @GetMapping("/plans/stats")
-    public ResponseEntity<List<Map<String, Object>>> getPlanStats() {
-        List<Map<String, Object>> stats = new ArrayList<>();
-        Map<String, Integer> completedPlans = planRepository.countByStatutGroupByMonth(STATUS.Termine);
-        Map<String, Integer> totalPlans = planRepository.countAllGroupByMonth();
-        
-        for (String month : totalPlans.keySet()) {
-            Map<String, Object> monthStat = new HashMap<>();
-            monthStat.put("month", month);
-            monthStat.put("completedPlans", completedPlans.getOrDefault(month, 0));
-            monthStat.put("totalPlans", totalPlans.get(month));
-            stats.add(monthStat);
-        }
-        
-        return ResponseEntity.ok(stats);
-    }
-    
-    @GetMapping("/ecarts/stats")
-    public ResponseEntity<Map<String, List<Map<String, Object>>>> getEcartsStats() {
-        Map<String, List<Map<String, Object>>> stats = new HashMap<>();
-        
-        // Get surplus and missing products
-        List<Map<String, Object>> surplus = new ArrayList<>();
-        List<Map<String, Object>> manquants = new ArrayList<>();
-        
-        List<ZoneProduit> zoneProduits = zoneRepository.findAllZoneProduits();
-        for (ZoneProduit zp : zoneProduits) {
-            int difference = zp.getQuantiteReelle() - zp.getQuantiteTheorique();
-            Map<String, Object> ecart = new HashMap<>();
-            ecart.put("productId", zp.getProduit().getId());
-            ecart.put("quantity", difference);
-            ecart.put("zone", zp.getZone().getName());
+    @Operation(summary = "Obtenir les statistiques globales")
+    @GetMapping("/global-stats")
+    public ResponseEntity<Map<String, Object>> getGlobalStats() {
+        try {
+            Map<String, Object> stats = new HashMap<>();
+
+            long totalPlans = planInventaireRepository.count();
+            long plansEnCours = planInventaireRepository.countByStatut(STATUS.EN_cours);
+            long plansTermines = planInventaireRepository.countByStatut(STATUS.Termine);
             
-            if (difference > 0) {
-                surplus.add(ecart);
-            } else if (difference < 0) {
-                manquants.add(ecart);
+            stats.put("totalPlans", totalPlans);
+            stats.put("plansEnCours", plansEnCours);
+            stats.put("plansTermines", plansTermines);
+            stats.put("tauxCompletion", totalPlans > 0 ? (double) plansTermines / totalPlans * 100 : 0);
+
+            List<Checkup> allCheckups = checkupRepository.findAll();
+            long totalCheckups = allCheckups.size();
+            long checkupsAvecRecomptage = allCheckups.stream()
+                .filter(c -> c.isDemandeRecomptage())
+                .count();
+
+            stats.put("totalCheckups", totalCheckups);
+            stats.put("checkupsAvecRecomptage", checkupsAvecRecomptage);
+            stats.put("tauxRecomptage", totalCheckups > 0 ? (double) checkupsAvecRecomptage / totalCheckups * 100 : 0);
+
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erreur lors de la récupération des statistiques globales", e);
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Obtenir les statistiques des écarts")
+    @GetMapping("/ecarts-stats")
+    public ResponseEntity<Map<String, Object>> getEcartsStats() {
+        try {
+            List<Ecart> ecarts = ecartRepository.findAll();
+            Map<String, Object> stats = new HashMap<>();
+            Map<EcartType, Long> ecartsByType = ecarts.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    Ecart::getType,
+                    java.util.stream.Collectors.counting()
+                ));
+
+            Map<EcartStatut, Long> ecartsByStatut = ecarts.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    Ecart::getStatut,
+                    java.util.stream.Collectors.counting()
+                ));
+
+            stats.put("totalEcarts", ecarts.size());
+            stats.put("ecartsByType", ecartsByType);
+            stats.put("ecartsByStatut", ecartsByStatut);
+
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erreur lors de la récupération des statistiques des écarts", e);
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    @Operation(summary = "Obtenir les statistiques de performance")
+    @GetMapping("/performance-stats")
+    public ResponseEntity<Map<String, Object>> getPerformanceStats() {
+        try {
+            List<PlanInventaire> plans = planInventaireRepository.findAll();
+            Map<String, Object> stats = new HashMap<>();
+
+            double avgCompletionTime = plans.stream()
+                .filter(p -> p.getDateDebut() != null && p.getDateFin() != null)
+                .mapToLong(p -> ChronoUnit.HOURS.between(p.getDateDebut(), p.getDateFin()))
+                .average()
+                .orElse(0.0);
+
+            Map<Long, Double> recomptagePlanStats = new HashMap<>();
+            for (PlanInventaire plan : plans) {
+                List<Checkup> planCheckups = checkupRepository.findByPlanId(plan.getId());
+                if (!planCheckups.isEmpty()) {
+                    long recomptages = planCheckups.stream()
+                        .filter(c -> c.isDemandeRecomptage())
+                        .count();
+                    recomptagePlanStats.put(plan.getId(), 
+                        (double) recomptages / planCheckups.size() * 100);
+                }
             }
+
+            stats.put("avgCompletionTimeHours", avgCompletionTime);
+            stats.put("recomptagePlanStats", recomptagePlanStats);
+
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erreur lors de la récupération des statistiques de performance", e);
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
-        
-        stats.put("surplus", surplus);
-        stats.put("manquants", manquants);
-        return ResponseEntity.ok(stats);
     }
-    
-    @GetMapping("/zones/stats")
-    public ResponseEntity<List<Map<String, Object>>> getZoneStats() {
-        List<Map<String, Object>> stats = new ArrayList<>();
-        
-        List<Zone> zones = zoneRepository.findAll();
-        for (Zone zone : zones) {
-            Map<String, Object> zoneStat = new HashMap<>();
-            zoneStat.put("zoneId", zone.getId());
-            zoneStat.put("name", zone.getName());
-            zoneStat.put("totalProducts", zone.getZoneProduits().size());
-            zoneStat.put("lastInventoryDate", getLastInventoryDate(zone));
-            zoneStat.put("accuracy", calculateZoneAccuracy(zone));
-            stats.add(zoneStat);
-        }
-        
-        return ResponseEntity.ok(stats);
-    }
-    
-    @GetMapping("/products/stats")
-    public ResponseEntity<List<Map<String, Object>>> getProductStats() {
-        List<Map<String, Object>> stats = new ArrayList<>();
-        
-        List<Produit> products = produitRepository.findAll();
-        for (Produit product : products) {
-            Map<String, Object> productStat = new HashMap<>();
-            productStat.put("productId", product.getId());
-            productStat.put("name", product.getNom());
-            productStat.put("ecartCount", countEcarts(product));
-            productStat.put("lastInventoryDate", getLastInventoryDate(product));
-            productStat.put("quantityTheoric", product.getQuantitetheo());
-            productStat.put("quantityReal", calculateRealQuantity(product));
-            stats.add(productStat);
-        }
-        
-        return ResponseEntity.ok(stats);
-    }
-    
-    private LocalDateTime getLastInventoryDate(Zone zone) {
-        return planRepository.findLastInventoryDateForZone(zone.getId());
-    }
-    
-    private double calculateZoneAccuracy(Zone zone) {
-        List<ZoneProduit> zoneProduits = (List<ZoneProduit>) zone.getZoneProduits();
-        if (zoneProduits.isEmpty()) return 100.0;
-        
-        int totalProducts = zoneProduits.size();
-        int correctProducts = 0;
-        
-        for (ZoneProduit zp : zoneProduits) {
-            if (zp.getQuantiteReelle() == zp.getQuantiteTheorique()) {
-                correctProducts++;
+
+    @Operation(summary = "Obtenir les statistiques temporelles")
+    @GetMapping("/time-stats")
+    public ResponseEntity<Map<String, Object>> getTimeStats(
+            @RequestParam(required = false) LocalDateTime startDate,
+            @RequestParam(required = false) LocalDateTime endDate
+    ) {
+        try {
+            if (startDate == null) {
+                startDate = LocalDateTime.now().minusMonths(1);
             }
+            if (endDate == null) {
+                endDate = LocalDateTime.now();
+            }
+
+            List<PlanInventaire> plans = planInventaireRepository.findByDateCreationBetween(startDate, endDate);
+            List<Checkup> checkups = checkupRepository.findByDateCheckBetween(startDate, endDate);
+            List<Ecart> ecarts = ecartRepository.findByDateCreationBetween(startDate, endDate);
+
+            Map<String, Object> stats = new HashMap<>();
+
+            stats.put("nombrePlans", plans.size());
+            stats.put("nombreCheckups", checkups.size());
+            stats.put("nombreEcarts", ecarts.size());
+
+            Map<String, Long> plansParJour = plans.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    p -> p.getDateCreation().toLocalDate().toString(),
+                    java.util.stream.Collectors.counting()
+                ));
+
+            Map<String, Long> checkupsParJour = checkups.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                    c -> c.getDateCheck().toLocalDate().toString(),
+                    java.util.stream.Collectors.counting()
+                ));
+
+            stats.put("evolutionPlans", plansParJour);
+            stats.put("evolutionCheckups", checkupsParJour);
+
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            log.error("Erreur lors de la récupération des statistiques temporelles", e);
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
-        
-        return (correctProducts * 100.0) / totalProducts;
-    }
-    
-    private int countEcarts(Produit product) {
-        return zoneRepository.countEcartsForProduct(product.getId());
-    }
-    
-    private LocalDateTime getLastInventoryDate(Produit product) {
-        return planRepository.findLastInventoryDateForProduct(product.getId());
-    }
-    
-    private int calculateRealQuantity(Produit product) {
-        return zoneRepository.sumRealQuantityForProduct(product.getId());
     }
 }

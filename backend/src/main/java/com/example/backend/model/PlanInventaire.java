@@ -53,8 +53,7 @@ public class PlanInventaire {
 
     private boolean inclusTousProduits = true;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "plan_id")
+    @OneToMany(mappedBy = "planInventaire", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<AssignationAgent> assignations = new HashSet<>();
 
     @ManyToOne
@@ -66,5 +65,6 @@ public class PlanInventaire {
     private Zone zone;
 
     private LocalDateTime dateCreation = LocalDateTime.now();
+
 
 }

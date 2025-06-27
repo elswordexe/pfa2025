@@ -56,7 +56,7 @@ const Inventory = () => {
         } else if (userRole === 'AGENT_INVENTAIRE') {
           plans = plans.filter(plan =>
             plan.assignations && Array.isArray(plan.assignations) &&
-            plan.assignations.some(a => a.id === userId)
+            plan.assignations.some(a => a.agent && a.agent.id === userId)
           );
         }
 
@@ -141,7 +141,6 @@ const Inventory = () => {
           const validatedForProduct = validatedProducts.filter(vp => vp.id === p.id);
           if (validatedForProduct.length === 0) return [p];
 
-          // retirer les zones déjà validées
           const remainingZones = p.zones.filter(z => !validatedForProduct.some(vp => Number(vp.validatedZone) === z.id));
           if (remainingZones.length === 0) return [];
 
@@ -157,8 +156,26 @@ const Inventory = () => {
           axios.get(`http://localhost:8080/checkups/plan/${planId}/type/MANUEL`),
           axios.get(`http://localhost:8080/checkups/plan/${planId}/type/SCAN`)
         ]);
-        setManualCheckups(manualRes.data || []);
-        setScanCheckups(scanRes.data || []);
+        
+
+        const manualData = manualRes.data.map(checkup => ({
+          ...checkup,
+          details: checkup.details.map(detail => ({
+            ...detail,
+            checkupId: checkup.id
+          }))
+        }));
+        
+        const scanData = scanRes.data.map(checkup => ({
+          ...checkup,
+          details: checkup.details.map(detail => ({
+            ...detail,
+            checkupId: checkup.id
+          }))
+        }));
+
+        setManualCheckups(manualData);
+        setScanCheckups(scanData);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error.message);
@@ -179,84 +196,107 @@ const Inventory = () => {
         axios.get(`http://localhost:8080/checkups/plan/${planId}/type/MANUEL`),
         axios.get(`http://localhost:8080/checkups/plan/${planId}/type/SCAN`)
       ]);
-      setManualCheckups(manualRes.data);
-      setScanCheckups(scanRes.data);
-    } catch {
-      alert("Erreur lors du rechargement");
+      
+      
+      const manualData = manualRes.data.map(checkup => ({
+        ...checkup,
+        details: checkup.details.map(detail => ({
+          ...detail,
+          checkupId: checkup.id
+        }))
+      }));
+      
+      const scanData = scanRes.data.map(checkup => ({
+        ...checkup,
+        details: checkup.details.map(detail => ({
+          ...detail,
+          checkupId: checkup.id
+        }))
+      }));
+
+      setManualCheckups(manualData);
+      setScanCheckups(scanData);
+    } catch (error) {
+      console.error('Error refreshing checkups:', error);
+      toast.error("Erreur lors du rechargement des contrôles");
     }
   };
 
-  const handleRaccomptage = async (checkupId, produitId) => {
+  const handleRaccomptage = async (checkupId, produitId, zoneId) => {
     if (!checkupId) {
       toast.warning("Recomptage non disponible pour ce produit (aucun contrôle manuel trouvé)");
       return;
     }
     setSelectedCheckupId(checkupId);
+    setSelectedProduct({ id: produitId, zoneId: zoneId });
     setShowJustificationModal(true);
-};
+  };
 
- const submitRecomptage = async () => {
-  if (!justification.trim()) {
-    toast.error("Veuillez fournir une justification");
-    return;
-  }
-
-  if (!selectedCheckupId) {
-    toast.error("Aucun contrôle sélectionné");
-    return;
-  }
-
-  try {
-    toast.info('Traitement de la demande de recomptage...', {
-      toastId: 'recomptage-start'
-    })
-    
-    await axios.put(`http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, {
-      justification: justification
-    });
-    
-   const checkup = [...manualCheckups, ...scanCheckups].find(c => c.id === selectedCheckupId);
-       if (checkup) {
-      const produitId = checkup.details?.[0]?.produit?.id;
-      
-      if (produitId) {
-        const product = planproducts.find(p => p.id === produitId);
-        if (product && product.zones) {
-          for (const zone of product.zones) {
-            try {
-              await axios.put(`http://localhost:8080/produits/${produitId}/zones/${zone.id}/updateQuantite`, {
-                quantiteManuelle: 0,
-                quantiteScannee: 0
-              });
-            } catch (zoneError) {
-              console.error(`Erreur lors de la réinitialisation pour la zone ${zone.id}:`, zoneError);
-            }
-          }
-          
-          toast.success('Quantités réinitialisées pour toutes les zones', {
-            toastId: 'quantities-reset'
-          });
-        }
-      }
+  const submitRecomptage = async () => {
+    if (!justification.trim()) {
+      toast.error("Veuillez fournir une justification");
+      return;
     }
 
-    await refreshCheckups();
-    await refreshData();
+    if (!selectedCheckupId || !selectedProduct) {
+      toast.error("Données de recomptage incomplètes");
+      return;
+    }
 
-    setShowJustificationModal(false);
-    setJustification('');
-    setSelectedCheckupId(null);
+    try {
+      toast.info('Traitement de la demande de recomptage...', {
+        toastId: 'recomptage-start'
+      });
 
-    toast.success('Recomptage initié avec succès', {
-      toastId: 'recomptage-success'
-    });
-  }  catch (error) {
-    console.error('Error during recount process:', error);
-    toast.error(`Erreur lors de la demande de recomptage: ${error.response?.data?.message || error.message}`, {
-      toastId: 'recomptage-error'
-    });
-  }
-};
+      
+      await axios.patch(
+        `http://localhost:8080/checkups/${selectedCheckupId}/reset-quantities`,
+        null,
+        {
+          params: {
+            produitId: selectedProduct.id,
+            zoneId: selectedProduct.zoneId
+          }
+        }
+      );
+      
+      
+      const response = await axios.put(
+        `http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, 
+        {
+          justification: justification,
+          demandeRecomptage: true
+        },
+        {
+          params: {
+            produitId: selectedProduct.id,
+            zoneId: selectedProduct.zoneId
+          }
+        }
+      );
+
+      if (response.data && response.data.message) {
+        toast.success(response.data.message, {
+          toastId: 'recomptage-success'
+        });
+      }
+
+      await refreshCheckups();
+      await refreshData();
+
+      setShowJustificationModal(false);
+      setJustification('');
+      setSelectedCheckupId(null);
+      setSelectedProduct(null);
+
+    } catch (error) {
+      console.error('Error during recount process:', error);
+      const errorMessage = error.response?.data?.error || error.response?.data || error.message;
+      toast.error(`Erreur lors de la demande de recomptage: ${errorMessage}`, {
+        toastId: 'recomptage-error'
+      });
+    }
+  };
   const handleValider = async (checkupId, produitId, scannedQty, manualQty, theoreticalQty, zoneIdOverride) => {
     const scanned = Number(scannedQty);
     const manual = Number(manualQty);
@@ -274,8 +314,7 @@ const Inventory = () => {
           toastId: 'validating'
         });
 
-        // Met à jour l'état local : retire uniquement la zone validée ;
-        // le produit n'est supprimé qu'une fois toutes ses zones validées
+       
         setPlanProducts(prev => prev.flatMap(p => {
           if (p.id !== produitId) return [p];
 
@@ -284,7 +323,7 @@ const Inventory = () => {
           delete updatedZoneQuantities[currentZone];
 
           if (remainingZones.length === 0) {
-            // plus aucune zone -> suppression du produit dans la vue
+           
             return [];
           }
           return [{ ...p, zones: remainingZones, zoneQuantities: updatedZoneQuantities }];
@@ -311,15 +350,13 @@ const Inventory = () => {
             return updated;
           });
         }
-
-        // s'il ne reste plus de zones, informer le backend pour retirer le produit du plan
+      
         if (planproducts.find(p => p.id === produitId)?.zones.length === 1) {
           try { await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`); } catch {}
         }
 
         const newQT = Number(manual) || Number(scanned) || theoretical;
 
-        // Mettre à jour quantité théorique côté serveur pour la zone et produit
         try {
           await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
             quantiteTheorique: newQT,
@@ -400,7 +437,6 @@ const Inventory = () => {
     //return () => clearInterval(interval);
   }, [planId]);
 
-  // Add refresh function
   const refreshData = async () => {
     await silentUpdate();
   };
@@ -469,6 +505,62 @@ const Inventory = () => {
     const stored = localStorage.getItem(`validated_${planId}`);
     setValidatedProducts(stored ? JSON.parse(stored) : []);
   }, [planId]);
+
+  const handleScan = async (checkupId, produitId, zoneId, quantity = 1) => {
+    try {
+      await axios.patch(
+        `http://localhost:8080/checkups/scan/${checkupId}`,
+        null,
+        {
+          params: {
+            produitId,
+            zoneId,
+            quantity
+          }
+        }
+      );
+
+      await refreshCheckups();
+      await refreshData();
+
+      toast.success('Scan enregistré avec succès');
+    } catch (error) {
+      console.error('Erreur lors du scan:', error);
+      toast.error('Erreur lors du scan: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
+  const handleBarcodeScan = async (barcode) => {
+    try {
+      const product = planproducts.find(p => p.codeBarre === barcode);
+      if (!product) {
+        toast.error('Produit non trouvé pour ce code-barre');
+        return;
+      }
+
+      const relevantCheckup = scanCheckups.find(checkup => 
+        checkup.details.some(detail => 
+          detail.produit.id === product.id && 
+          detail.zone.id === selectedZone.id
+        )
+      );
+
+      if (!relevantCheckup) {
+        toast.error('Aucun contrôle trouvé pour ce produit dans cette zone');
+        return;
+      }
+       
+      await handleScan(
+        relevantCheckup.id,
+        product.id,
+        selectedZone.id
+      );
+
+    } catch (error) {
+      console.error('Erreur lors du traitement du scan:', error);
+      toast.error('Erreur lors du traitement du scan');
+    }
+  };
 
   if (loading) {
     return (
@@ -927,10 +1019,24 @@ const Inventory = () => {
                                               )}
                                             </button>
                                             <button
-                                              onClick={() => handleRaccomptage(manualDetails.find(d => d.zone?.id === zone.id)?.checkupId)}
+                                              onClick={() => {
+                                                const manualDetail = manualCheckups.find(checkup => 
+                                                  checkup.details.some(detail => detail.zone?.id === zone.id)
+                                                );
+                                                if (manualDetail) {
+                                                  const detail = manualDetail.details.find(d => d.zone?.id === zone.id);
+                                                  if (detail && detail.produit) {
+                                                    handleRaccomptage(manualDetail.id, detail.produit.id, zone.id);
+                                                  }
+                                                }
+                                              }}
                                               className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm font-medium transition"
-                                              disabled={!manualDetails.find(d => d.zone?.id === zone.id)?.checkupId}
-                                              title={!manualDetails.find(d => d.zone?.id === zone.id)?.checkupId ? 'Recomptage non disponible pour ce produit' : 'Recompter'}
+                                              disabled={!manualCheckups.some(checkup => 
+                                                checkup.details.some(detail => detail.zone?.id === zone.id)
+                                              )}
+                                              title={!manualCheckups.some(checkup => 
+                                                checkup.details.some(detail => detail.zone?.id === zone.id)
+                                              ) ? 'Recomptage non disponible pour ce produit' : 'Recompter'}
                                             >
                                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

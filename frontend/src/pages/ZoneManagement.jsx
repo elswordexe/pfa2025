@@ -53,7 +53,6 @@ const ZoneManagement = () => {
   };
 
   const extractZoneProduits = (zone) => {
-    // Normalize to { id: produitId, quantitetheo } so that the rest of the code works the same
     return (zone.zoneProduits || []).map(zp => ({
       id: zp.produit?.id ?? zp.id?.produitId ?? zp.id,
       quantitetheo: zp.quantiteTheorique ?? zp.quantitetheo ?? 0
@@ -116,7 +115,6 @@ const ZoneManagement = () => {
     setSelectedZone(zone);
     setError(null);
 
-    // 1️⃣  Always restore unsaved edits for this zone if they exist
     const unsaved = unsavedZoneEdits[zone.id];
     if (unsaved) {
       setProductQuantities({ ...unsaved.productQuantities });
@@ -127,7 +125,7 @@ const ZoneManagement = () => {
       return;
     }
 
-    // 2️⃣  Otherwise, use the authoritative `zoneProduits` array already present on the zone object
+  
     setProductQuantities({});
     setSelectedProducts([]);
     setRemainingQty({});
@@ -147,7 +145,7 @@ const ZoneManagement = () => {
     setSelectedProducts(selected);
     const remaining = computeRemaining(quantities, zone.id);
     setRemainingQty(remaining);
-    // Save this as the initial unsaved state for this zone
+
     updateUnsavedZoneEdits(zone.id, quantities, selected, remaining, latestZoneProducts);
     setProductsModalOpen(true);
   };
@@ -204,10 +202,8 @@ const ZoneManagement = () => {
       };
       const patchResp = await axios.patch(`http://localhost:8080/Zone/update/${selectedZone.id}`, zoneData, { headers: { 'Content-Type': 'application/json', ...authHeaders } });
 
-      // Refresh lists (zones / products) so the rest of the app stays up-to-date
       await Promise.all([fetchZones(), fetchAvailableProducts()]);
 
-      // Use the server's response to build the modal state without another round-trip
       const normalizedZoneProduits = extractZoneProduits(patchResp.data);
       setZoneProducts(normalizedZoneProduits);
 

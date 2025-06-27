@@ -129,9 +129,9 @@ const handleSubmit = async (e) => {
           try {
             await axios.post(
               `http://localhost:8080/api/plans/${data.id}/agents/${selectedAgentId}/assignations`,
-              null,
+              {},
               {
-                headers: { ...authHeaders }
+                headers: { ...authHeaders, 'Content-Type': 'application/json' }
               }
             );
             console.log('Agent assigné à toutes les zones du plan');
@@ -486,7 +486,12 @@ const handleSubmit = async (e) => {
           <h3 className="text-xl font-semibold text-gray-800 mb-2">Plan d'inventaire créé avec succès!</h3>
           <p className="text-gray-600">Les notifications ont été envoyées aux agents assignés.</p>
           <button
-            onClick={() => window.location.href = '/inventory'}
+            onClick={() => {
+              if (plan.id) {
+                localStorage.setItem('selectedPlanId', plan.id);
+              }
+              navigate('/inventory');
+            }}
             className="mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg 
               hover:from-blue-700 hover:to-indigo-800 shadow-md transition inline-flex items-center gap-2"
           >

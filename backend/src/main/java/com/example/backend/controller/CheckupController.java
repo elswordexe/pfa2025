@@ -22,6 +22,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @CrossOrigin("*")
@@ -197,34 +199,87 @@ public class CheckupController {
     @PutMapping("/{checkupId}/recomptage")
     public ResponseEntity<?> demanderRecomptage(
             @PathVariable Long checkupId,
+            @RequestParam Long produitId,
+            @RequestParam Long zoneId,
             @RequestBody RecomptageRequest request
     ) {
         try {
             if (request.getJustification() == null || request.getJustification().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body("La justification est requise");
             }
+
             Checkup checkup = checkupRepository.findById(checkupId)
                     .orElseThrow(() -> new RuntimeException("Checkup not found"));
-            checkup.setDemandeRecomptage(Boolean.TRUE.equals(request.getDemandeRecomptage()));
+
+            checkup.setDemandeRecomptage(true);
             checkup.setJustificationRecomptage(request.getJustification());
+
             if (checkup.getDetails() != null) {
-                checkup.getDetails().forEach(detail -> {
-                    if (detail.getType() == CheckupType.MANUEL) {
-                        detail.setManualQuantity(0);
-                    } else if (detail.getType() == CheckupType.SCAN) {
-                        detail.setScannedQuantity(0);
+                for (CheckupDetail detail : checkup.getDetails()) {
+                    if (detail.getProduit().getId().equals(produitId) && 
+                        detail.getZone().getId().equals(zoneId)) {
+                        detail.setManualQuantity(null);
+                        detail.setScannedQuantity(null);
+                        break;
                     }
-                });
+                }
             }
             checkupRepository.save(checkup);
-            return ResponseEntity.ok().build();
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Recomptage demandé avec succès pour le produit dans la zone spécifiée");
+            response.put("justification", checkup.getJustificationRecomptage());
+            response.put("checkupId", checkup.getId());
+            response.put("produitId", produitId);
+            response.put("zoneId", zoneId);
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
+    @PatchMapping("/{checkupId}/reset-quantities")
+    public ResponseEntity<?> resetQuantities(
+            @PathVariable Long checkupId,
+            @RequestParam Long produitId,
+            @RequestParam Long zoneId
+    ) {
+        try {
+            Checkup checkup = checkupRepository.findById(checkupId)
+                    .orElseThrow(() -> new RuntimeException("Checkup not found"));
 
+            boolean quantitiesReset = false;
+            if (checkup.getDetails() != null) {
+                for (CheckupDetail detail : checkup.getDetails()) {
+                    if (detail.getProduit().getId().equals(produitId) && 
+                        detail.getZone().getId().equals(zoneId)) {
+                        detail.setManualQuantity(null);
+                        detail.setScannedQuantity(null);
+                        quantitiesReset = true;
+                        break;
+                    }
+                }
+            }
 
+            if (!quantitiesReset) {
+                return ResponseEntity.badRequest()
+                    .body("Aucun détail trouvé pour ce produit dans cette zone");
+            }
+
+            checkupRepository.save(checkup);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Quantités réinitialisées avec succès");
+            response.put("checkupId", checkupId);
+            response.put("produitId", produitId);
+            response.put("zoneId", zoneId);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
 
     @GetMapping("plan/{id}")
     public ResponseEntity<PlanInventaireDTO> getPlanById(@PathVariable Long id) {
@@ -258,10 +313,55 @@ public class CheckupController {
         }
     }
 
+    @PatchMapping("/scan/{checkupId}")
+    public ResponseEntity<?> updateScannedQuantity(
+            @PathVariable Long checkupId,
+            @RequestParam Long produitId,
+            @RequestParam Long zoneId,
+            @RequestParam(required = false) Integer quantity
+    ) {
+        try {
+            Checkup checkup = checkupRepository.findById(checkupId)
+                    .orElseThrow(() -> new RuntimeException("Checkup not found"));
+
+            boolean detailFound = false;
+            if (checkup.getDetails() != null) {
+                for (CheckupDetail detail : checkup.getDetails()) {
+                    if (detail.getProduit().getId().equals(produitId) && 
+                        detail.getZone().getId().equals(zoneId)) {
+                        Integer currentQuantity = detail.getScannedQuantity();
+                        if (currentQuantity == null) {
+                            currentQuantity = 0;
+                        }
+                        detail.setScannedQuantity(currentQuantity + (quantity != null ? quantity : 1));
+                        detailFound = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!detailFound) {
+                return ResponseEntity.badRequest()
+                    .body("Aucun détail trouvé pour ce produit dans cette zone");
+            }
+
+            checkupRepository.save(checkup);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Quantité scannée mise à jour avec succès");
+            response.put("checkupId", checkupId);
+            response.put("produitId", produitId);
+            response.put("zoneId", zoneId);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+        }
+    }
+
     private PlanInventaireDTO convertToDTO(PlanInventaire plan) {
         PlanInventaireDTO dto = new PlanInventaireDTO();
-
-
         dto.setId(plan.getId());
         dto.setNom(plan.getNom());
         dto.setDateDebut(plan.getDateDebut());
@@ -271,8 +371,6 @@ public class CheckupController {
         dto.setStatut(String.valueOf(plan.getStatut()));
         dto.setInclusTousProduits(plan.isInclusTousProduits());
         dto.setDateCreation(plan.getDateCreation());
-
-        // Convert zones (simplified)
         if (plan.getZones() != null) {
             plan.getZones().forEach(zone -> {
                 PlanInventaireDTO.ZoneDTO zoneDTO = new PlanInventaireDTO.ZoneDTO();
@@ -285,25 +383,21 @@ public class CheckupController {
             plan.getProduits().forEach(produit -> {
                 PlanInventaireDTO.ProduitDTO produitDTO = new PlanInventaireDTO.ProduitDTO();
                 produitDTO.setId(produit.getId());
-
                 if (produit.getCategory() != null) {
                     PlanInventaireDTO.CategoryDTO categoryDTO = new PlanInventaireDTO.CategoryDTO();
                     categoryDTO.setId(produit.getCategory().getId());
                     categoryDTO.setName(produit.getCategory().getName());
                     produitDTO.setCategoryDTO(categoryDTO);
                 }
-
                 if (produit.getSubCategory() != null) {
                     PlanInventaireDTO.SubCategoryDTO subCategoryDTO = new PlanInventaireDTO.SubCategoryDTO();
                     subCategoryDTO.setId(produit.getSubCategory().getId());
                     subCategoryDTO.setName(produit.getSubCategory().getName());
                     produitDTO.setSubCategoryDTO(subCategoryDTO);
                 }
-
                 dto.getProduits().add(produitDTO);
             });
         }
-
         if (plan.getCreateur() != null) {
             PlanInventaireDTO.UtilisateurDTO utilisateurDTO = new PlanInventaireDTO.UtilisateurDTO();
             utilisateurDTO.setId(plan.getCreateur().getId());
@@ -317,12 +411,10 @@ public class CheckupController {
         return dto;
     }  private Checkup convertToEntity(CheckupDTO dto) {
         Checkup checkup = new Checkup();
-
         checkup.setId(dto.getId());
         checkup.setValide(dto.isValide());
         checkup.setDemandeRecomptage(dto.isDemandeRecomptage());
         checkup.setJustificationRecomptage(dto.getJustificationRecomptage());
-
         checkup.setDateCheck(dto.getDateCheck() != null ? dto.getDateCheck() : LocalDateTime.now());
         if (dto.getAgent() != null && dto.getAgent().getId() != null) {
             AgentInventaire agent = agentInventaireRepository.findById(dto.getAgent().getId())
@@ -336,7 +428,6 @@ public class CheckupController {
         }
         if (dto.getDetails() != null && !dto.getDetails().isEmpty()) {
             List<CheckupDetail> details = new ArrayList<>();
-
             for (CheckupDTO.CheckupDetailDTO detailDTO : dto.getDetails()) {
                 CheckupDetail detail = new CheckupDetail();
                 detail.setId(detailDTO.getId());
@@ -350,16 +441,13 @@ public class CheckupController {
                             .orElseThrow(() -> new EntityNotFoundException("Produit not found with ID: " + detailDTO.getProduit().getId()));
                     detail.setProduit(produit);
                 }
-
                 if (detailDTO.getZone() != null && detailDTO.getZone().getId() != null) {
                     Zone zone = zoneRepository.findById(detailDTO.getZone().getId())
                             .orElseThrow(() -> new EntityNotFoundException("Zone not found with ID: " + detailDTO.getZone().getId()));
                     detail.setZone(zone);
                 }
-
                 details.add(detail);
             }
-
             checkup.setDetails(details);
         }
 
@@ -395,16 +483,12 @@ public class CheckupController {
 
         if (entity.getDetails() != null && !entity.getDetails().isEmpty()) {
             List<CheckupDTO.CheckupDetailDTO> detailDTOs = new ArrayList<>();
-
             for (CheckupDetail detail : entity.getDetails()) {
                 CheckupDTO.CheckupDetailDTO detailDTO = getCheckupDetailDTO(detail);
-
                 detailDTOs.add(detailDTO);
             }
-
             dto.setDetails(detailDTOs);
         }
-
         return dto;
     }
 
@@ -414,7 +498,6 @@ public class CheckupController {
         detailDTO.setScannedQuantity(detail.getScannedQuantity());
         detailDTO.setManualQuantity(detail.getManualQuantity());
         detailDTO.setType(detail.getType());
-
         if (detail.getProduit() != null) {
             CheckupDTO.ProduitDTO produitDTO = new CheckupDTO.ProduitDTO();
             produitDTO.setId(detail.getProduit().getId());
@@ -423,28 +506,24 @@ public class CheckupController {
             produitDTO.setNom(detail.getProduit().getNom());
             produitDTO.setDescription(detail.getProduit().getDescription());
             produitDTO.setQuantitetheo(detail.getProduit().getQuantitetheo());
-
             if (detail.getProduit().getCategory() != null) {
                 CheckupDTO.ProduitDTO.CategoryDTO categoryDTO = new CheckupDTO.ProduitDTO.CategoryDTO();
                 categoryDTO.setId(detail.getProduit().getCategory().getId());
                 categoryDTO.setName(detail.getProduit().getCategory().getName());
                 produitDTO.setCategory(categoryDTO);
             }
-
             if (detail.getProduit().getSubCategory() != null) {
                 CheckupDTO.ProduitDTO.SubCategoryDTO subCategoryDTO = new CheckupDTO.ProduitDTO.SubCategoryDTO();
                 subCategoryDTO.setId(detail.getProduit().getSubCategory().getId());
                 subCategoryDTO.setName(detail.getProduit().getSubCategory().getName());
                 produitDTO.setSubCategory(subCategoryDTO);
             }
-
             if (detail.getZone() != null) {
                 CheckupDTO.ZoneDTO z = new CheckupDTO.ZoneDTO();
                 z.setId(detail.getZone().getId());
                 z.setName(detail.getZone().getName());
                 detailDTO.setZone(z);
             }
-
             detailDTO.setProduit(produitDTO);
         }
         return detailDTO;
