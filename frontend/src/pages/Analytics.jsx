@@ -1,176 +1,134 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Box, Card, Grid, Typography, Select, 
-  Option, Table, Button
+  Option, Table, Button, CircularProgress
 } from '@mui/joy';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   PieChart, Pie, Cell, LineChart, Line, ResponsiveContainer 
 } from 'recharts';
 import Sidebarsuper from '../components/Sidebar';
+import axios from 'axios';
 
 const Analytics = () => {
-  const mockData = {
-    planStats: [
-      { month: 'Jan', completedPlans: 15, totalPlans: 20 },
-      { month: 'Fév', completedPlans: 18, totalPlans: 22 },
-      { month: 'Mar', completedPlans: 25, totalPlans: 28 },
-      { month: 'Avr', completedPlans: 22, totalPlans: 24 },
-      { month: 'Mai', completedPlans: 30, totalPlans: 32 },
-      { month: 'Jun', completedPlans: 28, totalPlans: 30 }
-    ],
-    ecartStats: {
-      surplus: Array(15).fill().map((_, i) => ({
-        productId: i + 1,
-        quantity: Math.floor(Math.random() * 10) + 1,
-        zone: `Zone ${String.fromCharCode(65 + (i % 5))}`
-      })),
-      manquants: Array(8).fill().map((_, i) => ({
-        productId: i + 20,
-        quantity: -(Math.floor(Math.random() * 10) + 1),
-        zone: `Zone ${String.fromCharCode(65 + (i % 5))}`
-      }))
-    },
-    zoneStats: [
-      { zoneId: 1, name: 'Zone A', accuracy: 95, totalProducts: 150 },
-      { zoneId: 2, name: 'Zone B', accuracy: 89, totalProducts: 120 },
-      { zoneId: 3, name: 'Zone C', accuracy: 92, totalProducts: 200 },
-      { zoneId: 4, name: 'Zone D', accuracy: 85, totalProducts: 180 },
-      { zoneId: 5, name: 'Zone E', accuracy: 90, totalProducts: 160 }
-    ],
-    productStats: Array(10).fill().map((_, i) => ({
-      productId: i + 1,
-      name: `Produit ${i + 1}`,
-      zone: `Zone ${String.fromCharCode(65 + (i % 5))}`,
-      quantityTheoric: 100 + (i * 10),
-      quantityReal: 100 + (i * 10) + (Math.floor(Math.random() * 21) - 10),
-      lastInventoryDate: new Date(2025, 5, Math.floor(Math.random() * 30) + 1)
-    })),
-    historicalData: Array(12).fill().map((_, i) => ({
-      date: `2025-${(i + 1).toString().padStart(2, '0')}`,
-      discrepancies: Math.floor(Math.random() * 50) + 20
-    }))
+  const [timeframe, setTimeframe] = useState('month');
+  const [loading, setLoading] = useState(true);
+  const [analyticsData, setAnalyticsData] = useState({
+    globalStats: null,
+    ecartsStats: null,
+    performanceStats: null,
+    timeStats: null
+  });
+
+  const fetchAnalytics = async (start = null, end = null) => {
+    setLoading(true);
+    try {
+      const [globalRes, ecartsRes, performanceRes, timeRes] = await Promise.all([
+        axios.get('http://localhost:8080/api/analytics/global-stats'),
+        axios.get('http://localhost:8080/api/analytics/ecarts-stats'),
+        axios.get('http://localhost:8080/api/analytics/performance-stats'),
+        axios.get('http://localhost:8080/api/analytics/time-stats', {
+          params: {
+            startDate: start,
+            endDate: end
+          }
+        })
+      ]);
+
+      setAnalyticsData({
+        globalStats: globalRes.data,
+        ecartsStats: ecartsRes.data,
+        performanceStats: performanceRes.data,
+        timeStats: timeRes.data
+      });
+    } catch (error) {
+      console.error('Erreur lors de la récupération des analytics:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const generateTimeframeData = (timeframe) => {
-    const today = new Date();
-    let data = {
-      planStats: [],
-      historicalData: [],
-      zoneStats: mockData.zoneStats,
-      ecartStats: mockData.ecartStats,
-      productStats: mockData.productStats,
-    };
-
+  useEffect(() => {
+    const now = new Date();
+    let startDate;
+    
     switch (timeframe) {
       case 'week':
-        // Generate last 7 days data
-        for (let i = 6; i >= 0; i--) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          data.planStats.push({
-            month: date.toLocaleDateString('fr-FR', { weekday: 'short' }),
-            completedPlans: Math.floor(Math.random() * 5) + 3,
-            totalPlans: Math.floor(Math.random() * 3) + 5
-          });
-          data.historicalData.push({
-            date: date.toISOString().split('T')[0],
-            discrepancies: Math.floor(Math.random() * 20) + 5
-          });
-        }
+        startDate = new Date(now.setDate(now.getDate() - 7));
         break;
-
       case 'month':
-        for (let i = 29; i >= 0; i--) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          data.planStats.push({
-            month: `${date.getDate()}/${date.getMonth() + 1}`,
-            completedPlans: Math.floor(Math.random() * 8) + 5,
-            totalPlans: Math.floor(Math.random() * 5) + 8
-          });
-          data.historicalData.push({
-            date: date.toISOString().split('T')[0],
-            discrepancies: Math.floor(Math.random() * 30) + 10
-          });
-        }
+        startDate = new Date(now.setMonth(now.getMonth() - 1));
         break;
-
       case 'quarter':
-        for (let i = 11; i >= 0; i--) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - (i * 7));
-          data.planStats.push({
-            month: `S${Math.floor(i/4) + 1}-${Math.floor(i%4) + 1}`,
-            completedPlans: Math.floor(Math.random() * 15) + 10,
-            totalPlans: Math.floor(Math.random() * 8) + 15
-          });
-          data.historicalData.push({
-            date: date.toISOString().split('T')[0],
-            discrepancies: Math.floor(Math.random() * 40) + 15
-          });
-        }
+        startDate = new Date(now.setMonth(now.getMonth() - 3));
         break;
-
       case 'year':
-        data.planStats = mockData.planStats;
-        data.historicalData = mockData.historicalData;
+        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
         break;
-
       default:
-        data = mockData;
+        startDate = new Date(now.setMonth(now.getMonth() - 1));
     }
+    
+    fetchAnalytics(startDate.toISOString(), new Date().toISOString());
+  }, [timeframe]);
 
-    return data;
-  };
-
-  const [timeframe, setTimeframe] = useState('month');
-  const [currentData, setCurrentData] = useState(generateTimeframeData('month'));
-
-  // Update data when timeframe changes
   const handleTimeframeChange = (_, value) => {
     if (value) {
       setTimeframe(value);
-      setCurrentData(generateTimeframeData(value));
     }
   };
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
-  const renderInventoryChart = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={currentData.planStats}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="completedPlans" fill="#82ca9d" name="Plans Complétés" />
-        <Bar dataKey="totalPlans" fill="#8884d8" name="Total Plans" />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  const renderGlobalStats = () => {
+    if (!analyticsData.globalStats) return null;
+    
+    const { totalPlans, plansEnCours, plansTermines, tauxCompletion } = analyticsData.globalStats;
+    
+    return (
+      <Grid container spacing={2}>
+        <Grid xs={12} md={3}>
+          <Card variant="soft">
+            <Typography level="h4">{totalPlans}</Typography>
+            <Typography>Plans Totaux</Typography>
+          </Card>
+        </Grid>
+        <Grid xs={12} md={3}>
+          <Card variant="soft">
+            <Typography level="h4">{plansEnCours}</Typography>
+            <Typography>Plans en Cours</Typography>
+          </Card>
+        </Grid>
+        <Grid xs={12} md={3}>
+          <Card variant="soft">
+            <Typography level="h4">{plansTermines}</Typography>
+            <Typography>Plans Terminés</Typography>
+          </Card>
+        </Grid>
+        <Grid xs={12} md={3}>
+          <Card variant="soft">
+            <Typography level="h4">{tauxCompletion.toFixed(1)}%</Typography>
+            <Typography>Taux de Complétion</Typography>
+          </Card>
+        </Grid>
+      </Grid>
+    );
+  };
 
   const renderEcartsChart = () => {
-    const ECART_COLORS = {
-      surplus: '#4CAF50',
-      manquants: '#FF5252'
-    };
+    if (!analyticsData.ecartsStats) return null;
+
+    const { ecartsByType, ecartsByStatut } = analyticsData.ecartsStats;
+    const data = Object.entries(ecartsByType).map(([type, count]) => ({
+      name: type,
+      value: count
+    }));
 
     return (
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
-            data={[
-              { 
-                name: 'Surplus', 
-                value: currentData.ecartStats.surplus?.length || 0
-              },
-              { 
-                name: 'Manquants', 
-                value: currentData.ecartStats.manquants?.length || 0
-              }
-            ]}
+            data={data}
             dataKey="value"
             nameKey="name"
             cx="50%"
@@ -178,8 +136,9 @@ const Analytics = () => {
             outerRadius={100}
             label
           >
-            <Cell fill={ECART_COLORS.surplus} />
-            <Cell fill={ECART_COLORS.manquants} />
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
           </Pie>
           <Tooltip />
           <Legend />
@@ -188,57 +147,61 @@ const Analytics = () => {
     );
   };
 
-  const renderZonePerformance = () => (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={currentData.zoneStats}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="name" />
-        <YAxis />
-        <Tooltip />
-        <Bar dataKey="accuracy" name="Précision (%)" fill="#8884d8" />
-      </BarChart>
-    </ResponsiveContainer>
-  );
+  const renderPerformanceChart = () => {
+    if (!analyticsData.performanceStats) return null;
 
-  const renderDetailedReport = () => (
-    <Table>
-      <thead>
-        <tr>
-          <th>Produit</th>
-          <th>Zone</th>
-          <th>Écart</th>
-          <th>Date dernier inventaire</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {currentData.productStats.map((product) => (
-          <tr key={product.productId}>
-            <td>{product.name}</td>
-            <td>{product.zone}</td>
-            <td className={
-              product.quantityTheoric - product.quantityReal > 0 
-                ? 'text-red-500' 
-                : 'text-green-500'
-            }>
-              {product.quantityTheoric - product.quantityReal}
-            </td>
-            <td>{new Date(product.lastInventoryDate).toLocaleDateString()}</td>
-            <td>
-              <Button
-                size="sm"
-                variant="soft"
-                color="primary"
-                onClick={() => handleViewDetails(product.productId)}
-              >
-                Détails
-              </Button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </Table>
-  );
+    const { recomptagePlanStats } = analyticsData.performanceStats;
+    const data = Object.entries(recomptagePlanStats).map(([planId, taux]) => ({
+      planId: `Plan ${planId}`,
+      taux: taux
+    }));
+
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="planId" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Bar dataKey="taux" name="Taux de Recomptage (%)" fill="#8884d8" />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  const renderTimeStats = () => {
+    if (!analyticsData.timeStats) return null;
+
+    const { evolutionPlans, evolutionCheckups } = analyticsData.timeStats;
+    const data = Object.entries(evolutionPlans).map(([date, count]) => ({
+      date,
+      plans: count,
+      checkups: evolutionCheckups[date] || 0
+    }));
+
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
+          <Line type="monotone" dataKey="plans" name="Plans" stroke="#8884d8" />
+          <Line type="monotone" dataKey="checkups" name="Contrôles" stroke="#82ca9d" />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.surface' }}>
@@ -259,44 +222,34 @@ const Analytics = () => {
         </Box>
 
         <Grid container spacing={3}>
+          <Grid xs={12}>
+            {renderGlobalStats()}
+          </Grid>
+          
           <Grid xs={12} md={6}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
-                Écarts par Type
+                Répartition des Écarts
               </Typography>
               {renderEcartsChart()}
             </Card>
           </Grid>
+          
           <Grid xs={12} md={6}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
-                Performance par Zone
+                Performance des Plans
               </Typography>
-              {renderZonePerformance()}
+              {renderPerformanceChart()}
             </Card>
           </Grid>
+          
           <Grid xs={12}>
             <Card>
               <Typography level="h5" sx={{ mb: 2 }}>
-                Tendances des Écarts
+                Évolution Temporelle
               </Typography>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={currentData.historicalData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="discrepancies" stroke="#82ca9d" />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
-          </Grid>
-          <Grid xs={12}>
-            <Card>
-              <Typography level="h5" sx={{ mb: 2 }}>
-                Rapport Détaillé
-              </Typography>
-              {renderDetailedReport()}
+              {renderTimeStats()}
             </Card>
           </Grid>
         </Grid>

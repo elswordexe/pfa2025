@@ -19,7 +19,7 @@ axios.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.warn("[Axios] 401 Unauthorized — Token peut être expiré.");
       localStorage.removeItem("token");
-      window.location.href = "/login"; // ou utilise navigate('/login') si tu es dans un composant React
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
