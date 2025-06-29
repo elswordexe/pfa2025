@@ -40,7 +40,6 @@ export default function PlanManagement() {
 
   const navigate = useNavigate();
 
-  // Fetch assignments for all plans
   const fetchAssignationsForPlans = async (plansList) => {
     const result = {};
     await Promise.all(
@@ -121,7 +120,6 @@ export default function PlanManagement() {
     }
   };
 
-  // Ajouter cette fonction pour regrouper les logs
   const groupLogs = (logs) => {
     const groupedMap = new Map();
 
@@ -131,7 +129,6 @@ export default function PlanManagement() {
       const detail = log.details[0];
       if (!detail.produit || !detail.zone) return;
 
-      // Utiliser une clé qui identifie uniquement le checkup et le produit
       const key = `${detail.produit.id}_${detail.zone.id}_${new Date(log.dateCheck).getTime()}`;
       
       if (!groupedMap.has(key)) {
@@ -228,7 +225,6 @@ export default function PlanManagement() {
                       ...plan,
                       dateDebut: dayjs(plan.dateDebut).format('YYYY-MM-DDTHH:mm'),
                       dateFin: dayjs(plan.dateFin).format('YYYY-MM-DDTHH:mm'),
-                      // Ensure statut, produits, zones, assignations, etc. are present
                       statut: plan.statut || '',
                       produits: plan.produits || [],
                       zones: plan.zones || [],
@@ -302,11 +298,9 @@ export default function PlanManagement() {
                   <th>Produit</th>
                   <th>Zone</th>
                   <th style={{ textAlign: 'center' }}>
-                    <i className="material-icons" style={{fontSize: '16px', marginRight: '4px'}}>qr_code_scanner</i>
                     Scan
                   </th>
                   <th style={{ textAlign: 'center' }}>
-                    <i className="material-icons" style={{fontSize: '16px', marginRight: '4px'}}>edit</i>
                     Manuel
                   </th>
                   <th>État</th>

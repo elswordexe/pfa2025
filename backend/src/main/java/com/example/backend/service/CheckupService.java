@@ -57,7 +57,6 @@ public class CheckupService {
 
     public List<Checkup> findByPlanAndType(Long planId, CheckupType type) {
         List<Checkup> allCheckups = checkupRepository.findByPlanId(planId);
-        // Only keep checkups that have at least one detail of the requested type
         return allCheckups.stream()
             .filter(checkup -> checkup.getDetails() != null &&
                 checkup.getDetails().stream().anyMatch(detail -> detail.getType() == type))

@@ -98,7 +98,7 @@ public class ZoneController {
     public ResponseEntity<?> deleteZone(@PathVariable Long zoneId){
         return zoneRepository.findById(zoneId)
             .map(zone -> {
-                zoneRepository.delete(zone); // la suppression en cascade gère les relations
+                zoneRepository.delete(zone);
                 return ResponseEntity.ok().build();
             })
             .orElse(ResponseEntity.notFound().build());

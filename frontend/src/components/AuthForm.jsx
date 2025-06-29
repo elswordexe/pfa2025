@@ -90,7 +90,6 @@ export const AuthForm = () => {
         return;
       }
 
-      // Logique login / inscription
       const url = isLogin
         ? "http://localhost:8080/users/login"
         : "http://localhost:8080/users/register";
@@ -144,9 +143,6 @@ export const AuthForm = () => {
           case "AGENT_INVENTAIRE":
             window.location.href = "/dashboard";
             break;
-          case "Utilisateur":
-            window.location.href = "/dashboard";
-            break;
           default:
             alert("Rôle inconnu : accès refusé");
         }
@@ -173,10 +169,7 @@ export const AuthForm = () => {
 
         localStorage.setItem("token", token);
         navigate("/dashboard");
-      } else {
-        const response = await axios.post("http://localhost:8080/users/register", formData);
-        setShowSuccessModal(true);
-      }
+      } 
     } catch (err) {
       setError(err.response?.data?.message || "Une erreur est survenue");
     }

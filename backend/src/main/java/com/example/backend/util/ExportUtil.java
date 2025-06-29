@@ -138,7 +138,6 @@ public class ExportUtil {
         public void exportDataToExcel(HttpServletResponse response) throws IOException {
             Sheet sheet = workbook.createSheet("Écarts d'inventaire");
 
-            // Add plan info
             Row titleRow = sheet.createRow(0);
             titleRow.createCell(0).setCellValue("Plan: " + plan.getNom());
             Row dateRow = sheet.createRow(1);
@@ -155,21 +154,18 @@ public class ExportUtil {
             CellStyle headerStyle = createHeaderStyle();
             CellStyle dataStyle = createDataStyle();
 
-            // Write headers
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
                 cell.setCellStyle(headerStyle);
             }
 
-            // Write data
             int rowNum = 4;
             for (Ecart ecart : ecarts) {
                 Row row = sheet.createRow(rowNum++);
                 addDataRow(row, ecart, dataStyle);
             }
 
-            // Autosize columns
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
             }

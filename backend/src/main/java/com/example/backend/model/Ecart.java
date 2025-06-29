@@ -25,7 +25,6 @@ public class Ecart {
    private  EcartType type;
     private Integer quantiteComptee;
 
-    // L'écart est calculé automatiquement
     @Column(name = "ecart_quantite")
     private Integer ecartQuantite;
 
@@ -38,8 +37,6 @@ public class Ecart {
             this.ecartQuantite = this.quantiteComptee - this.produit.getQuantitetheo();
         }
     }
-
-    // Helper method to get la quantité théorique from Produit
     public Integer getQuantiteTheorique() {
         return this.produit != null ? this.produit.getQuantitetheo() : null;
     }

@@ -111,7 +111,6 @@ public class ProduitImportService {
         Map<String, SubCategory> subCategoryCache = new HashMap<>();
         
         for (Produit produit : importedProduits) {
-            // Handle category
             if (produit.getCategory() != null && produit.getCategory().getName() != null) {
                 String categoryName = produit.getCategory().getName();
                 Category category = categoryCache.computeIfAbsent(categoryName, name -> {

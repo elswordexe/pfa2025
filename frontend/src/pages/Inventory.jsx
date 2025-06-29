@@ -14,6 +14,7 @@ const Inventory = () => {
   const [manualCheckups, setManualCheckups] = useState([]);
   const [scanCheckups, setScanCheckups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProducts, setSelectedProducts] = useState([]);
   const [planId, setPlanId] = useState(() => {
     const stored = localStorage.getItem('selectedPlanId');
     return stored ? Number(stored) : null;
@@ -314,7 +315,42 @@ const Inventory = () => {
           toastId: 'validating'
         });
 
-       
+        const productInZone = planproducts.find(p => 
+          p.id === produitId && p.zones.some(z => z.id === Number(currentZone))
+        );
+
+        const finalQuantity = Number(manual) || Number(scanned) || theoretical;
+
+        if (!productInZone) {
+        
+          try {
+            await axios.post(`http://localhost:8080/Zone/${currentZone}/produits/${produitId}`, {
+              quantiteTheorique: finalQuantity
+            });
+            toast.success('Produit ajouté à la zone avec succès');
+          } catch (error) {
+            console.error('Erreur lors de l\'ajout du produit à la zone:', error);
+            toast.error('Erreur lors de l\'ajout du produit à la zone');
+            return;
+          }
+        }
+
+        try {
+          await axios.post(`http://localhost:8080/api/plans/${planId}/produits-valides`, {
+            produitId: produitId,
+            zoneId: currentZone,
+            quantiteTheorique: finalQuantity,
+            quantiteManuelle: manual !== '-' ? Number(manual) : null,
+            quantiteScan: scanned !== '-' ? Number(scanned) : null,
+            dateValidation: new Date().toISOString(),
+            planId: planId
+          });
+        } catch (error) {
+          console.error('Erreur lors de la sauvegarde du produit validé:', error);
+          toast.error('Erreur lors de la sauvegarde de la validation');
+          return;
+        }
+
         setPlanProducts(prev => prev.flatMap(p => {
           if (p.id !== produitId) return [p];
 
@@ -323,7 +359,6 @@ const Inventory = () => {
           delete updatedZoneQuantities[currentZone];
 
           if (remainingZones.length === 0) {
-           
             return [];
           }
           return [{ ...p, zones: remainingZones, zoneQuantities: updatedZoneQuantities }];
@@ -340,7 +375,7 @@ const Inventory = () => {
           const newValidated = {
             ...validatedProd,
             validatedZone: currentZone,
-            quantiteTheorique: Number(manual) || Number(scanned) || theoretical,
+            quantiteTheorique: finalQuantity,
             quantiteManuelle: manual !== '-' ? Number(manual) : null,
             quantiteScan: scanned !== '-' ? Number(scanned) : null,
           };
@@ -350,16 +385,16 @@ const Inventory = () => {
             return updated;
           });
         }
-      
-        if (planproducts.find(p => p.id === produitId)?.zones.length === 1) {
-          try { await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`); } catch {}
-        }
 
-        const newQT = Number(manual) || Number(scanned) || theoretical;
+        if (planproducts.find(p => p.id === produitId)?.zones.length === 1) {
+          try { 
+            await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`); 
+          } catch {}
+        }
 
         try {
           await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
-            quantiteTheorique: newQT,
+            quantiteTheorique: finalQuantity,
             status: 'VERIFIE'
           });
         } catch (qErr) {
@@ -382,6 +417,70 @@ const Inventory = () => {
       await validateProduct();
     }
   };
+
+
+  const loadValidatedProducts = async () => {
+    try {
+      const response = await axios.get(`http://localhost:8080/api/plans/${planId}/produits-valides`);
+      const validatedFromDB = response.data;
+      setValidatedProducts(validatedFromDB);
+      localStorage.setItem(`validated_${planId}`, JSON.stringify(validatedFromDB));
+    } catch (error) {
+      console.error('Erreur lors du chargement des produits validés:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (planId) {
+      loadValidatedProducts();
+    }
+  }, [planId]);
+
+  const handleBulkValidation = async (products) => {
+    try {
+      toast.info('Validation en masse en cours...', { toastId: 'bulk-validating' });
+    
+      try {
+        await axios.post(`http://localhost:8080/api/plans/${planId}/produits-valides/bulk`, {
+          produits: products.map(product => ({
+            produitId: product.produitId,
+            zoneId: product.zoneId,
+            quantiteTheorique: Number(product.manualQty) || Number(product.scannedQty) || product.theoreticalQty,
+            quantiteManuelle: product.manualQty !== '-' ? Number(product.manualQty) : null,
+            quantiteScan: product.scannedQty !== '-' ? Number(product.scannedQty) : null,
+            dateValidation: new Date().toISOString(),
+            planId: planId
+          }))
+        });
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde en masse des produits validés:', error);
+        toast.error('Erreur lors de la sauvegarde des validations');
+        return;
+      }
+
+      for (const product of products) {
+        const { checkupId, produitId, scannedQty, manualQty, theoreticalQty, zoneId } = product;
+        await handleValider(
+          checkupId,
+          produitId,
+          scannedQty,
+          manualQty,
+          theoreticalQty,
+          zoneId
+        );
+      }
+      
+      toast.success('Validation en masse terminée avec succès', { toastId: 'bulk-success' });
+      await refreshData();
+      await loadValidatedProducts();
+      setSelectedProducts([]);
+      
+    } catch (error) {
+      console.error('Erreur lors de la validation en masse:', error);
+      toast.error('Erreur lors de la validation en masse');
+    }
+  };
+
   const getQuantityColor = (scannedQty, manualQty, theoreticalQty) => {
     const scanned = Number(scannedQty);
     const manual = Number(manualQty);
@@ -789,6 +888,27 @@ const Inventory = () => {
               <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white"><tr>
+                      <th className="p-4 text-left">
+                        <input
+                          type="checkbox"
+                          onChange={(e) => {
+                            const allProducts = planproducts
+                              .filter(product => !selectedZone || product.zones.some(z => z.id.toString() === selectedZone))
+                              .filter(product => 
+                                !filter || 
+                                product.nom?.toLowerCase().includes(filter.toLowerCase()) ||
+                                product.codeBarre?.toLowerCase().includes(filter.toLowerCase())
+                              );
+                            if (e.target.checked) {
+                              setSelectedProducts(allProducts.map(p => p.id));
+                            } else {
+                              setSelectedProducts([]);
+                            }
+                          }}
+                          checked={selectedProducts.length > 0 && selectedProducts.length === planproducts.length}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                      </th>
                       <th className="p-4 text-left">Produit</th>
                       <th className="p-4 text-left">Référence</th>
                       <th className="p-4 text-left">Zone</th>
@@ -822,8 +942,22 @@ const Inventory = () => {
                         const zoneNames = product.zones?.map(z => z?.name).filter(Boolean).join(', ') || '-';
 
                         return (
-                          <tr key={product.id} className="border-b hover:bg-blue-50 transition">                           
-                           <td className="p-4 font-medium text-gray-800">{product.nom || '-'}</td>
+                          <tr key={product.id} className="border-b hover:bg-blue-50 transition">
+                            <td className="p-4">
+                              <input
+                                type="checkbox"
+                                checked={selectedProducts.includes(product.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedProducts([...selectedProducts, product.id]);
+                                  } else {
+                                    setSelectedProducts(selectedProducts.filter(id => id !== product.id));
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            </td>
+                            <td className="p-4 font-medium text-gray-800">{product.nom || '-'}</td>
                             <td className="p-4 text-blue-600 font-mono">{product.codeBarre || '-'}</td>
                             <td className="p-4 text-gray-600">
                               {product.zones && product.zones.length > 0 ? 
@@ -1086,6 +1220,52 @@ const Inventory = () => {
               <div className="text-sm text-gray-600">
                 {planproducts.length} produits au total
               </div>
+              {selectedProducts.length > 0 && (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-gray-600">
+                    {selectedProducts.length} produit(s) sélectionné(s)
+                  </span>
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`Voulez-vous valider les ${selectedProducts.length} produits sélectionnés ?`)) {
+                        return;
+                      }
+                      
+                      const productsToValidate = selectedProducts.map(productId => {
+                        const product = planproducts.find(p => p.id === productId);
+                        const scanDetails = scanCheckups.flatMap(s => s.details)
+                          .filter(d => d.produit?.id === productId && (!selectedZone || d.zone?.id === Number(selectedZone)));
+                        const manualDetails = manualCheckups.flatMap(m => m.details)
+                          .filter(d => d.produit?.id === productId && (!selectedZone || d.zone?.id === Number(selectedZone)));
+                        
+                        const scanned = scanDetails.length > 0 ? scanDetails.reduce((sum, d) => sum + (d.scannedQuantity || 0), 0) : "-";
+                        const manual = manualDetails.length > 0 ? manualDetails.reduce((sum, d) => sum + (d.scannedQuantity || d.manualQuantity || 0), 0) : "-";
+                        const theoreticalQty = selectedZone 
+                          ? getZoneQuantity(selectedZone, product)
+                          : product.zones.reduce((sum, zone) => sum + getZoneQuantity(zone.id, product), 0);
+                        
+                        return {
+                          checkupId: manualDetails[0]?.checkupId,
+                          produitId: productId,
+                          scannedQty: scanned,
+                          manualQty: manual,
+                          theoreticalQty: theoreticalQty,
+                          zoneId: selectedZone || product.zones[0]?.id
+                        };
+                      });
+                      
+                      await handleBulkValidation(productsToValidate);
+                      setSelectedProducts([]);
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    Valider la sélection
+                  </button>
+                </div>
+              )}
               <div className="flex gap-2">
                 <button 
                   className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50"
