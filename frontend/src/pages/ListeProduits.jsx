@@ -158,14 +158,28 @@ const [showPDF, setShowPDF] = useState(false);
 
   const handleEditSubmit = async () => {
     try {
-      const response = await axios.put(
-        `http://localhost:8080/produits/${editingProduct.id}`,
-        editingProduct,
-        { headers: authHeaders }
-      );
-
-      const updatedProduct = response.data;
-      setProducts(products.map(p => 
+      let updatedProduct = { ...editingProduct };
+      if (editingProduct.imageFile) {
+        const formData = new FormData();
+        Object.entries(editingProduct).forEach(([key, value]) => {
+          if (key !== 'imageFile') formData.append(key, value);
+        });
+        formData.append('image', editingProduct.imageFile);
+        const response = await axios.put(
+          `http://localhost:8080/produits/${editingProduct.id}`,
+          formData,
+          { headers: { ...authHeaders, 'Content-Type': 'multipart/form-data' } }
+        );
+        updatedProduct = response.data;
+      } else {
+        const response = await axios.put(
+          `http://localhost:8080/produits/${editingProduct.id}`,
+          editingProduct,
+          { headers: authHeaders }
+        );
+        updatedProduct = response.data;
+      }
+      setProducts(products.map(p =>
         p.id === updatedProduct.id ? updatedProduct : p
       ));
       setEditModalOpen(false);
@@ -364,13 +378,32 @@ const [showPDF, setShowPDF] = useState(false);
                               }}
                             >
                               <td>
-                                {product.imageUrl ? (
-                                  <img src={product.imageUrl} alt={product.nom} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8 }} />
-                                ) : (
-                                  <div style={{ width: 48, height: 48, background: '#f3f4f6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bdbdbd', fontSize: 24 }}>
-                                    <span role="img" aria-label="no image">🖼️</span>
-                                  </div>
-                                )}
+                                {(() => {
+                                  let src = '';
+                                  if (product.imageData) {
+                                    src = `data:image/jpeg;base64,${product.imageData}`;
+                                  } else if (product.imageUrl && typeof product.imageUrl === 'string' && product.imageUrl.trim() !== '') {
+                                    if (/^data:image\//.test(product.imageUrl)) {
+                                      src = product.imageUrl;
+                                    } else if (/^([A-Za-z0-9+/=]{100,})$/.test(product.imageUrl)) {
+                                      src = `data:image/jpeg;base64,${product.imageUrl}`;
+                                    } else {
+                                      src = product.imageUrl;
+                                    }
+                                  }
+                                  return src ? (
+                                    <img
+                                      src={src}
+                                      alt={product.nom}
+                                      style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8 }}
+                                      onError={e => { e.target.onerror = null; e.target.src = '/placeholder.png'; }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: 48, height: 48, background: '#f3f4f6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bdbdbd', fontSize: 24 }}>
+                                      <span role="img" aria-label="no image">🖼️</span>
+                                    </div>
+                                  );
+                                })()}
                               </td>
                               <td>{product.nom}</td>
                               <td>{product.description}</td>
@@ -513,6 +546,36 @@ const [showPDF, setShowPDF] = useState(false);
                   />
                 </FormControl>
 
+                <FormControl>
+                  <FormLabel>Image</FormLabel>
+                  <Input
+                    type="file"
+                    name="image"
+                    accept="image/*"
+                    onChange={e => {
+                      if (e.target.files && e.target.files[0]) {
+                        setEditingProduct(prev => ({
+                          ...prev,
+                          imageFile: e.target.files[0]
+                        }));
+                      }
+                    }}
+                  />
+                  {editingProduct?.imageUrl && (() => {
+                    let src = editingProduct.imageUrl;
+                    if (typeof src === 'string') {
+                      if (/^data:image\//.test(src)) {
+                        // Already a data URL
+                      } else if (/^([A-Za-z0-9+/=]{100,})$/.test(src)) {
+                        src = `data:image/jpeg;base64,${src}`;
+                      } else if (!src.startsWith('http')) {
+                        src = '/placeholder.png';
+                      }
+                    }
+                    return <img src={src} alt="Produit" style={{ width: 80, height: 80, marginTop: 8, borderRadius: 8, objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.src = '/placeholder.png'; }} />;
+                  })()}
+                </FormControl>
+
                 {editError && (
                   <Typography color="danger" fontSize="sm">
                     {editError}
@@ -531,7 +594,40 @@ const [showPDF, setShowPDF] = useState(false);
               <Button
                 variant="solid"
                 color="primary"
-                onClick={handleEditSubmit}
+                onClick={async () => {
+                  try {
+                    let updatedProduct = { ...editingProduct };
+                    if (editingProduct.imageFile) {
+                      const formData = new FormData();
+                      Object.entries(editingProduct).forEach(([key, value]) => {
+                        if (key !== 'imageFile') formData.append(key, value);
+                      });
+                      formData.append('image', editingProduct.imageFile);
+                      const response = await axios.put(
+                        `http://localhost:8080/produits/${editingProduct.id}`,
+                        formData,
+                        { headers: { ...authHeaders, 'Content-Type': 'multipart/form-data' } }
+                      );
+                      updatedProduct = response.data;
+                    } else {
+                      const response = await axios.put(
+                        `http://localhost:8080/produits/${editingProduct.id}`,
+                        editingProduct,
+                        { headers: authHeaders }
+                      );
+                      updatedProduct = response.data;
+                    }
+                    setProducts(products.map(p =>
+                      p.id === updatedProduct.id ? updatedProduct : p
+                    ));
+                    setEditModalOpen(false);
+                    setEditingProduct(null);
+                    setEditError(null);
+                  } catch (error) {
+                    console.error('Edit error:', error);
+                    setEditError(error.response?.data?.message || error.message || 'Erreur lors de la modification');
+                  }
+                }}
               >
                 Enregistrer
               </Button>

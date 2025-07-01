@@ -116,12 +116,28 @@ public class ProduitController {
             if (requestMap.containsKey("reference")) produit.setReference((String) requestMap.get("reference"));
             if (requestMap.containsKey("CodeBarre")) produit.setCodeBarre((String) requestMap.get("CodeBarre"));
             if (requestMap.containsKey("imageUrl")) produit.setImageUrl((String) requestMap.get("imageUrl"));
+            if (requestMap.containsKey("quantitetheo")) {
+                Object qteObj = requestMap.get("quantitetheo");
+                if (qteObj instanceof Number) {
+                    produit.setQuantitetheo(((Number) qteObj).intValue());
+                } else if (qteObj instanceof String) {
+                    produit.setQuantitetheo(Integer.parseInt((String) qteObj));
+                }
+            }
             if (requestMap.containsKey("category") && requestMap.get("category") != null) {
                 Map<String, Object> categoryMap = (Map<String, Object>) requestMap.get("category");
                 if (categoryMap.containsKey("id")) {
                     Category category = new Category();
                     category.setId(Long.valueOf(categoryMap.get("id").toString()));
                     produit.setCategory(category);
+                }
+            }
+            if (requestMap.containsKey("subCategory") && requestMap.get("subCategory") != null) {
+                Map<String, Object> subCategoryMap = (Map<String, Object>) requestMap.get("subCategory");
+                if (subCategoryMap.containsKey("id")) {
+                    SubCategory subCategory = new SubCategory();
+                    subCategory.setId(Long.valueOf(subCategoryMap.get("id").toString()));
+                    produit.setSubCategory(subCategory);
                 }
             }
             produit.setZones(new ArrayList<>());
@@ -495,6 +511,16 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
         dto.setQuantitetheo(produit.getQuantitetheo());
         dto.setDatecremod(produit.getDatecremod());
         dto.setImageUrl(produit.getImageUrl());
+        // Add base64 image data if available
+        if (produit.getId() != null && produit.getImageUrl() != null && !produit.getImageUrl().isEmpty()) {
+            try {
+                byte[] imageData = produitImageService.getProductImage(produit.getId());
+                String base64Image = java.util.Base64.getEncoder().encodeToString(imageData);
+                dto.setImageData(base64Image);
+            } catch (Exception e) {
+                // Optionally log error
+            }
+        }
 
         if (produit.getCategory() != null) {
             ProduitDTO.CategoryDTO categoryDTO = new ProduitDTO.CategoryDTO();

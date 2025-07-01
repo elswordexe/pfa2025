@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 
 @RestController
 @CrossOrigin(origins = "*")
@@ -84,9 +86,30 @@ public class UtilisateurController {
         }
     }
     //test
-    @Operation(summary = "Créer un compte administrateur client", description = "Crée un compte admin pour un client spécifique")
+    @Operation(
+        summary = "Créer un compte administrateur client",
+        description = "Crée un compte admin pour un client spécifique",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Données de l'administrateur client à créer",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Exemple admin client",
+                    value = "{\n  \"nom\": \"Durand\",\n  \"prenom\": \"Alice\",\n  \"email\": \"alice.durand@example.com\",\n  \"username\": \"alice.durand\",\n  \"telephone\": \"0601020304\",\n  \"role\": \"ADMIN_CLIENT\"\n}"
+                )
+            )
+        )
+    )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Admin client créé avec succès"),
+            @ApiResponse(responseCode = "200", description = "Admin client créé avec succès",
+                content = @Content(
+                    examples = @ExampleObject(
+                        name = "Réponse admin client créé",
+                        value = "{\n  \"message\": \"Administrateur client créé avec succès\",\n  \"user\": {\n    \"id\": 5,\n    \"nom\": \"Durand\",\n    \"prenom\": \"Alice\",\n    \"email\": \"alice.durand@example.com\",\n    \"role\": \"ADMIN_CLIENT\"\n  }\n}"
+                    )
+                )
+            ),
             @ApiResponse(responseCode = "400", description = "Données invalides ou client non trouvé")
     })
     @PostMapping("users/client-admin/{clientId}")
@@ -102,9 +125,30 @@ public class UtilisateurController {
         }
     }
     
-    @Operation(summary = "Créer un compte agent d'inventaire", description = "Crée un compte agent pour un client spécifique")
+    @Operation(
+        summary = "Créer un compte agent d'inventaire",
+        description = "Crée un compte agent pour un client spécifique",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Données de l'agent à créer",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Exemple agent inventaire",
+                    value = "{\n  \"nom\": \"Martin\",\n  \"prenom\": \"Paul\",\n  \"email\": \"paul.martin@example.com\",\n  \"username\": \"paul.martin\",\n  \"telephone\": \"0605060708\",\n  \"role\": \"AGENT_INVENTAIRE\"\n}"
+                )
+            )
+        )
+    )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Agent créé avec succès"),
+            @ApiResponse(responseCode = "200", description = "Agent créé avec succès",
+                content = @Content(
+                    examples = @ExampleObject(
+                        name = "Réponse agent créé",
+                        value = "{\n  \"message\": \"Agent d'inventaire créé avec succès\",\n  \"user\": {\n    \"id\": 6,\n    \"nom\": \"Martin\",\n    \"prenom\": \"Paul\",\n    \"email\": \"paul.martin@example.com\",\n    \"role\": \"AGENT_INVENTAIRE\"\n  }\n}"
+                    )
+                )
+            ),
             @ApiResponse(responseCode = "400", description = "Données invalides ou client non trouvé")
     })
     @PostMapping("users/agent-inventaire/{clientId}")
@@ -120,9 +164,30 @@ public class UtilisateurController {
         }
     }
 
-    @Operation(summary = "connexion d utilisateur")
+    @Operation(
+        summary = "connexion d utilisateur",
+        description = "Connexion d'un utilisateur avec email et mot de passe",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Identifiants de connexion",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Exemple login",
+                    value = "{\n  \"email\": \"alice.durand@example.com\",\n  \"password\": \"motdepasse123\"\n}"
+                )
+            )
+        )
+    )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "connexion réussie"),
+            @ApiResponse(responseCode = "200", description = "connexion réussie",
+                content = @Content(
+                    examples = @ExampleObject(
+                        name = "Réponse connexion",
+                        value = "{\n  \"message\": \"Connexion réussie\",\n  \"user\": {\n    \"id\": 5,\n    \"nom\": \"Durand\",\n    \"prenom\": \"Alice\",\n    \"email\": \"alice.durand@example.com\",\n    \"role\": \"ADMIN_CLIENT\"\n  },\n  \"token\": \"eyJhbGciOiJIUzI1NiJ9...\"\n}"
+                    )
+                )
+            ),
             @ApiResponse(responseCode = "400", description = "erreur de connexion")
     })
     @PostMapping("users/login")
@@ -238,9 +303,30 @@ public class UtilisateurController {
     return ResponseEntity.ok(Map.of("message", "Utilisateur supprimé"));
     }
 
-    @Operation(summary = "Modification d'Utilisateur")
+    @Operation(
+        summary = "Modification d'Utilisateur",
+        description = "Modifier les informations d'un utilisateur existant.",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Données à modifier",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Exemple modification utilisateur",
+                    value = "{\n  \"nom\": \"Durand\",\n  \"prenom\": \"Alice\",\n  \"email\": \"alice.durand@example.com\",\n  \"username\": \"alice.durand\",\n  \"telephone\": \"0601020304\",\n  \"role\": \"ADMIN_CLIENT\"\n}"
+                )
+            )
+        )
+    )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Modification avec succès"),
+            @ApiResponse(responseCode = "200", description = "Modification avec succès",
+                content = @Content(
+                    examples = @ExampleObject(
+                        name = "Réponse modification utilisateur",
+                        value = "{\n  \"id\": 5,\n  \"nom\": \"Durand\",\n  \"prenom\": \"Alice\",\n  \"email\": \"alice.durand@example.com\",\n  \"role\": \"ADMIN_CLIENT\"\n}"
+                    )
+                )
+            ),
             @ApiResponse(responseCode = "500", description = "Erreur serveur lors de la modification des données")
     })
     @PutMapping("users/{id}")

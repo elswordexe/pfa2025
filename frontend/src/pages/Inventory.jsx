@@ -6,6 +6,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import InventoryPDF from '../components/InventoryPDF';
 import { getUserIdFromToken, getRoleFromToken } from '../utils/auth';
+import { exportProductsToExcel } from '../services/exportExcel';
 
 const ITEMS_PER_PAGE = 5;
 
@@ -37,8 +38,10 @@ const Inventory = () => {
   const firstLoadRef = useRef(true);
   const userRole = getRoleFromToken();
   const [manualQuantities, setManualQuantities] = useState({});
+
+  // Validated products are now saved to localStorage for temporary persistence
   const [validatedProducts, setValidatedProducts] = useState(() => {
-    const stored = localStorage.getItem(`validated_${planId || 'default'}`);
+    const stored = localStorage.getItem('validatedProducts');
     return stored ? JSON.parse(stored) : [];
   });
 
@@ -95,31 +98,18 @@ const Inventory = () => {
       }
       try {
         const zonesRes = await axios.get('http://localhost:8080/Zone/all');
-        console.log('All zones:', zonesRes.data);
         const allZones = zonesRes.data || [];
-
         const planRes = await axios.get(`http://localhost:8080/api/plans/${planId}/details`);
-        console.log('Plan details:', planRes.data); 
         const zoneProductsRes = await axios.get(`http://localhost:8080/api/plans/${planId}/zone-products`);
-        const firstZone = Object.keys(zoneProductsRes.data || {})[0];
-        const firstProduct = zoneProductsRes.data[firstZone]?.[0];
-
         const zones = allZones;
         const zoneProducts = zoneProductsRes.data || {};
-    
         const productsWithZones = Object.entries(zoneProducts).reduce((acc, [zoneId, products = []]) => {
-          products.forEach(product => {            const existingProduct = acc.find(p => p.id === product.id);
+          products.forEach(product => {
+            const existingProduct = acc.find(p => p.id === product.id);
             const zoneObj = zones.find(z => z.id === Number(zoneId));
-            
             const zoneWithProducts = zones.find(z => z.id === Number(zoneId));
-            
-            const zoneProduit = zoneWithProducts?.zoneProduits?.find(zp => 
-              zp.id.produitId === product.id && zp.id.zoneId === Number(zoneId)
-            ); 
-            const quantiteTheo = zoneProduit?.quantiteTheorique || 
-                               product.quantiteTheorique ||
-                               0;
-
+            const zoneProduit = zoneWithProducts?.zoneProduits?.find(zp => zp.id.produitId === product.id && zp.id.zoneId === Number(zoneId));
+            const quantiteTheo = zoneProduit?.quantiteTheorique || product.quantiteTheorique || 0;
             if (existingProduct) {
               existingProduct.zones.push(zoneObj);
               existingProduct.zoneQuantities = {
@@ -136,46 +126,29 @@ const Inventory = () => {
           });
           return acc;
         }, []);
-
         const filtered = productsWithZones.flatMap(p => {
           const validatedForProduct = validatedProducts.filter(vp => vp.id === p.id);
           if (validatedForProduct.length === 0) return [p];
-
           const remainingZones = p.zones.filter(z => !validatedForProduct.some(vp => Number(vp.validatedZone) === z.id));
           if (remainingZones.length === 0) return [];
-
           const updatedZoneQuantities = { ...p.zoneQuantities };
           validatedForProduct.forEach(vp => { delete updatedZoneQuantities[vp.validatedZone]; });
-
           return [{ ...p, zones: remainingZones, zoneQuantities: updatedZoneQuantities }];
         });
         setPlanProducts(filtered);
         setZones(zones);
-
-        const [manualRes, scanRes] = await Promise.all([
-          axios.get(`http://localhost:8080/checkups/plan/${planId}/type/MANUEL`),
-          axios.get(`http://localhost:8080/checkups/plan/${planId}/type/SCAN`)
-        ]);
-        
-
-        const manualData = manualRes.data.map(checkup => ({
+        const allCheckupsRes = await axios.get(`http://localhost:8080/checkups/plan/${planId}/type/ALL`);
+        const allCheckups = allCheckupsRes.data || [];
+        const manualCheckups = allCheckups.map(checkup => ({
           ...checkup,
-          details: checkup.details.map(detail => ({
-            ...detail,
-            checkupId: checkup.id
-          }))
+          details: checkup.details.filter(d => d.manualQuantity !== null || d.manualQuantity !== undefined)
         }));
-        
-        const scanData = scanRes.data.map(checkup => ({
+        const scanCheckups = allCheckups.map(checkup => ({
           ...checkup,
-          details: checkup.details.map(detail => ({
-            ...detail,
-            checkupId: checkup.id
-          }))
+          details: checkup.details.filter(d => d.scannedQuantity !== null || d.scannedQuantity !== undefined)
         }));
-
-        setManualCheckups(manualData);
-        setScanCheckups(scanData);
+        setManualCheckups(manualCheckups);
+        setScanCheckups(scanCheckups);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError(error.message);
@@ -186,36 +159,23 @@ const Inventory = () => {
         }
       }
     };
-
     fetchZonesAndPlan();
   }, [planId]);
 
   const refreshCheckups = async () => {
     try {
-      const [manualRes, scanRes] = await Promise.all([
-        axios.get(`http://localhost:8080/checkups/plan/${planId}/type/MANUEL`),
-        axios.get(`http://localhost:8080/checkups/plan/${planId}/type/SCAN`)
-      ]);
-      
-      
-      const manualData = manualRes.data.map(checkup => ({
+      const allCheckupsRes = await axios.get(`http://localhost:8080/checkups/plan/${planId}/type/ALL`);
+      const allCheckups = allCheckupsRes.data || [];
+      const manualCheckups = allCheckups.map(checkup => ({
         ...checkup,
-        details: checkup.details.map(detail => ({
-          ...detail,
-          checkupId: checkup.id
-        }))
+        details: checkup.details.filter(d => d.manualQuantity !== null || d.manualQuantity !== undefined)
       }));
-      
-      const scanData = scanRes.data.map(checkup => ({
+      const scanCheckups = allCheckups.map(checkup => ({
         ...checkup,
-        details: checkup.details.map(detail => ({
-          ...detail,
-          checkupId: checkup.id
-        }))
+        details: checkup.details.filter(d => d.scannedQuantity !== null || d.scannedQuantity !== undefined)
       }));
-
-      setManualCheckups(manualData);
-      setScanCheckups(scanData);
+      setManualCheckups(manualCheckups);
+      setScanCheckups(scanCheckups);
     } catch (error) {
       console.error('Error refreshing checkups:', error);
       toast.error("Erreur lors du rechargement des contrôles");
@@ -248,7 +208,6 @@ const Inventory = () => {
         toastId: 'recomptage-start'
       });
 
-      
       await axios.patch(
         `http://localhost:8080/checkups/${selectedCheckupId}/reset-quantities`,
         null,
@@ -259,8 +218,7 @@ const Inventory = () => {
           }
         }
       );
-      
-      
+
       const response = await axios.put(
         `http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, 
         {
@@ -281,8 +239,8 @@ const Inventory = () => {
         });
       }
 
+      await silentUpdate();
       await refreshCheckups();
-      await refreshData();
 
       setShowJustificationModal(false);
       setJustification('');
@@ -308,13 +266,12 @@ const Inventory = () => {
       return;
     }
 
-    const validateProduct = async () => {
+    const validateProduct = async (finalQty) => {
       try {
         toast.info('Validation en cours...', {
           toastId: 'validating'
         });
 
-       
         setPlanProducts(prev => prev.flatMap(p => {
           if (p.id !== produitId) return [p];
 
@@ -323,11 +280,22 @@ const Inventory = () => {
           delete updatedZoneQuantities[currentZone];
 
           if (remainingZones.length === 0) {
-           
             return [];
           }
           return [{ ...p, zones: remainingZones, zoneQuantities: updatedZoneQuantities }];
         }));
+
+        // Add validated product to localStorage
+        setValidatedProducts(prev => [
+          ...prev,
+          {
+            id: produitId,
+            nom: planproducts.find(p => p.id === produitId)?.nom,
+            codeBarre: planproducts.find(p => p.id === produitId)?.codeBarre,
+            validatedZone: currentZone,
+            quantiteValidee: finalQty
+          }
+        ]);
 
         if (checkupId) {
           await axios.put(`http://localhost:8080/checkups/${checkupId}/valider`);
@@ -335,31 +303,16 @@ const Inventory = () => {
 
         toast.success('Produit validé', { toastId: 'checkup-validated' });
 
-        const validatedProd = planproducts.find(p => p.id === produitId);
-        if (validatedProd) {
-          const newValidated = {
-            ...validatedProd,
-            validatedZone: currentZone,
-            quantiteTheorique: Number(manual) || Number(scanned) || theoretical,
-            quantiteManuelle: manual !== '-' ? Number(manual) : null,
-            quantiteScan: scanned !== '-' ? Number(scanned) : null,
-          };
-          setValidatedProducts(prev => {
-            const updated = [...prev, newValidated];
-            localStorage.setItem(`validated_${planId}`, JSON.stringify(updated));
-            return updated;
-          });
-        }
-      
+        await refreshCheckups();
+        await silentUpdate();
+
         if (planproducts.find(p => p.id === produitId)?.zones.length === 1) {
           try { await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`); } catch {}
         }
 
-        const newQT = Number(manual) || Number(scanned) || theoretical;
-
         try {
           await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
-            quantiteTheorique: newQT,
+            quantiteTheorique: finalQty,
             status: 'VERIFIE'
           });
         } catch (qErr) {
@@ -376,10 +329,26 @@ const Inventory = () => {
         toast.error('La quantité manuelle n\'est pas un nombre valide');
         return;
       }
-      await validateProduct();
+      const choice = window.prompt(
+        `Les quantités scannées (${scanned}) et manuelles (${manual}) ne correspondent pas.\n` +
+        `Veuillez saisir la quantité à valider (scannée: ${scanned}, manuelle: ${manual}):`,
+        manual
+      );
+      let finalQty;
+      if (choice === null) {
+        toast.info('Validation annulée. Aucune action effectuée.');
+        return;
+      } else {
+        finalQty = Number(choice);
+        if (isNaN(finalQty)) {
+          toast.error('Quantité choisie invalide');
+          return;
+        }
+        await validateProduct(finalQty);
+      }
     } else {
       if (!window.confirm('Confirmer la validation de ce produit ?')) return;
-      await validateProduct();
+      await validateProduct(manual);
     }
   };
   const getQuantityColor = (scannedQty, manualQty, theoreticalQty) => {
@@ -407,6 +376,11 @@ const Inventory = () => {
 
   const handleExportPDF = () => {
     setShowPDF(true);
+  };
+
+  const exportInventoryExcel = (planId) => {
+    const url = `http://localhost:8080/api/plans/${planId}/ecarts/export/xlsx`;
+    window.open(url, '_blank');
   };
 
   useEffect(() => {
@@ -501,8 +475,15 @@ const Inventory = () => {
     });
   }
 
+  // Save validated products to localStorage whenever they change
   useEffect(() => {
-    const stored = localStorage.getItem(`validated_${planId}`);
+    localStorage.setItem('validatedProducts', JSON.stringify(validatedProducts));
+  }, [validatedProducts]);
+
+  // Load validated products from localStorage when planId changes
+  useEffect(() => {
+    if (!planId) return;
+    const stored = localStorage.getItem('validatedProducts');
     setValidatedProducts(stored ? JSON.parse(stored) : []);
   }, [planId]);
 
@@ -663,7 +644,7 @@ const Inventory = () => {
                   Export PDF
                 </button>
                 <button
-                  onClick={() => window.open(`http://localhost:8080/ecarts/export/xlsx?planId=${planId}`, '_blank')}
+                  onClick={() => exportProductsToExcel(planproducts, `inventaire_plan_${planId}.xlsx`)}
                   className="flex items-center gap-2 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg shadow-md transition"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -807,13 +788,40 @@ const Inventory = () => {
                         product.codeBarre?.toLowerCase().includes(filter.toLowerCase())
                       )
                       .map(product => {
-                        const scanDetails = scanCheckups.flatMap(s => s.details)
-                          .filter(d => d.produit?.id === product.id && (!selectedZone || d.zone?.id === Number(selectedZone)));
-                        const manualDetails = manualCheckups.flatMap(m => m.details)
-                          .filter(d => d.produit?.id === product.id && (!selectedZone || d.zone?.id === Number(selectedZone)));
 
-                        const scanned = scanDetails.length > 0 ? scanDetails.reduce((sum, d) => sum + (d.scannedQuantity || 0), 0) : "-";
-                        const manual = manualDetails.length > 0 ? manualDetails.reduce((sum, d) => sum + (d.scannedQuantity || d.manualQuantity || 0), 0) : "-";
+                        
+                        let zoneIds = product.zones.map(z => z.id);
+                        let usedZoneId = selectedZone ? Number(selectedZone) : (zoneIds.length === 1 ? zoneIds[0] : null);
+                        
+                        let manual = "-";
+                        let scanned = "-";
+                        if (usedZoneId) {
+                          const detail = manualCheckups.concat(scanCheckups).flatMap(c => c.details)
+                            .find(d => d.produit?.id === product.id && d.zone?.id === usedZoneId);
+                          if (detail) {
+                            manual = detail.manualQuantity !== undefined && detail.manualQuantity !== null ? Number(detail.manualQuantity) : "-";
+                            scanned = detail.scannedQuantity !== undefined && detail.scannedQuantity !== null ? Number(detail.scannedQuantity) : "-";
+                          }
+                        } else {
+                          const details = manualCheckups.concat(scanCheckups).flatMap(c => c.details)
+                            .filter(d => d.produit?.id === product.id);
+                          let manualSum = 0;
+                          let scannedSum = 0;
+                          let foundManual = false;
+                          let foundScanned = false;
+                          details.forEach(d => {
+                            if (d.manualQuantity !== undefined && d.manualQuantity !== null) {
+                              manualSum += Number(d.manualQuantity);
+                              foundManual = true;
+                            }
+                            if (d.scannedQuantity !== undefined && d.scannedQuantity !== null) {
+                              scannedSum += Number(d.scannedQuantity);
+                              foundScanned = true;
+                            }
+                          });
+                          manual = foundManual ? manualSum : "-";
+                          scanned = foundScanned ? scannedSum : "-";
+                        }
 
                         const theoreticalQty = selectedZone 
                           ? getZoneQuantity(selectedZone, product)
@@ -828,10 +836,8 @@ const Inventory = () => {
                             <td className="p-4 text-gray-600">
                               {product.zones && product.zones.length > 0 ? 
                                 product.zones.map(zone => {
-                                  console.log('Zone in render:', zone);
                                   if (!zone) return '-';
                                   const zoneName = zone.nom || zone.name || zone.designation || '-';
-                                  console.log('Zone name used:', zoneName);
                                   return zoneName;
                                 }).join(', ') 
                                 : '-'}
@@ -844,9 +850,31 @@ const Inventory = () => {
                                 type="number"
                                 min="0"
                                 value={manualQuantities[product.id] !== undefined ? manualQuantities[product.id] : (manual !== '-' ? manual : '')}
-                                onChange={e => {
+                                onBlur={async e => {
                                   const value = e.target.value;
                                   setManualQuantities(prev => ({ ...prev, [product.id]: value }));
+                                  let usedZoneId = selectedZone ? Number(selectedZone) : (product.zones.length === 1 ? product.zones[0].id : null);
+                                  if (!usedZoneId) return;
+                                  const manualDetail = manualCheckups.concat(scanCheckups).flatMap(c => c.details)
+                                    .find(d => d.produit?.id === product.id && d.zone?.id === usedZoneId);
+                                  if (manualDetail && manualDetail.checkupId) {
+                                    try {
+                                      await axios.patch(
+                                        `http://localhost:8080/checkups/manual/${manualDetail.checkupId}`,
+                                        null,
+                                        {
+                                          params: {
+                                            produitId: product.id,
+                                            zoneId: usedZoneId,
+                                            quantity: Number(value)
+                                          }
+                                        }
+                                      );
+                                      await refreshCheckups();
+                                    } catch (err) {
+                                      toast.error('Erreur lors de la mise à jour de la quantité manuelle');
+                                    }
+                                  } 
                                 }}
                                 className="w-20 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="-"
@@ -926,12 +954,16 @@ const Inventory = () => {
                                   product.codeBarre.toLowerCase().includes(filter.toLowerCase())
                                 )
                                 .map(product => {
-                                  const scanDetails = scanCheckups.flatMap(s => s.details)
-                                        .filter(d => d.produit.id === product.id && d.zone?.id === zone.id);
-                                  const manualDetails = manualCheckups.flatMap(m => m.details)
-                                        .filter(d => d.produit.id === product.id && d.zone?.id === zone.id);
-                                  const scanned = scanDetails.length > 0 ? scanDetails.reduce((sum, d) => sum + (d.scannedQuantity || 0), 0) : "-";
-                                  const manual = manualDetails.length > 0 ? manualDetails.reduce((sum, d) => sum + (d.scannedQuantity || d.manualQuantity || 0), 0) : "-";
+                                  const detail = manualCheckups.concat(scanCheckups).flatMap(c => c.details)
+                                    .find(d => d.produit?.id === product.id && d.zone?.id === zone.id);
+                                  let manual = "-";
+                                  let scanned = "-";
+                                  let checkupId = null;
+                                  if (detail) {
+                                    manual = detail.manualQuantity !== undefined && detail.manualQuantity !== null ? Number(detail.manualQuantity) : "-";
+                                    scanned = detail.scannedQuantity !== undefined && detail.scannedQuantity !== null ? Number(detail.scannedQuantity) : "-";
+                                    checkupId = detail.checkupId || null;
+                                  }
                                   const zoneProduit = zone.zoneProduits?.find(zp => 
                                     zp.id.produitId === product.id && zp.id.zoneId === zone.id
                                   );
@@ -950,9 +982,29 @@ const Inventory = () => {
                                           type="number"
                                           min="0"
                                           value={manualQuantities[product.id] !== undefined ? manualQuantities[product.id] : (manual !== '-' ? manual : '')}
-                                          onChange={e => {
+                                          onBlur={async e => {
                                             const value = e.target.value;
                                             setManualQuantities(prev => ({ ...prev, [product.id]: value }));
+                                            const manualDetail = manualCheckups.concat(scanCheckups).flatMap(c => c.details)
+                                              .find(d => d.produit?.id === product.id && d.zone?.id === zone.id);
+                                            if (manualDetail && manualDetail.checkupId) {
+                                              try {
+                                                await axios.patch(
+                                                  `http://localhost:8080/checkups/manual/${manualDetail.checkupId}`,
+                                                  null,
+                                                  {
+                                                    params: {
+                                                      produitId: product.id,
+                                                      zoneId: zone.id,
+                                                      quantity: Number(value)
+                                                    }
+                                                  }
+                                                );
+                                                await refreshCheckups();
+                                              } catch (err) {
+                                                toast.error('Erreur lors de la mise à jour de la quantité manuelle');
+                                              }
+                                            } 
                                           }}
                                           className="w-20 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                           placeholder="-"
@@ -978,7 +1030,7 @@ const Inventory = () => {
                                                   return;
                                                 }
                                                 handleValider(
-                                                  manualDetails.find(d => d.zone?.id === zone.id)?.checkupId,
+                                                  checkupId,
                                                   product.id,
                                                   scanned,
                                                   manual,
@@ -986,7 +1038,7 @@ const Inventory = () => {
                                                   zone.id
                                                 );
                                               }}
-                                              disabled={product.status === 'VERIFIE' || (!manual && !scanned)}
+                                              disabled={product.status === 'VERIFIE' || (!manual && !scanned) }
                                               className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition ${
                                                 product.status === 'VERIFIE'
                                                   ? 'bg-gray-300 cursor-not-allowed text-gray-600'
@@ -1014,7 +1066,7 @@ const Inventory = () => {
                                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                                   </svg>
-                                                  {!manualDetails.find(d => d.zone?.id === zone.id)?.checkupId ? 'Non disponible' : 'Valider'}
+                                                  { (manual !== "-" && scanned !== "-") ? 'Valider' : 'Non disponible'}
                                                 </>
                                               )}
                                             </button>
@@ -1064,18 +1116,21 @@ const Inventory = () => {
                       <th className="p-4 text-left">Produit</th>
                       <th className="p-4 text-left">Référence</th>
                       <th className="p-4 text-left">Zone validée</th>
+                      <th className="p-4 text-left">Quantité validée</th>
                     </tr>
                   </thead>
                   <tbody>
                     {validatedProducts.map(vp => (
-                      <tr key={`${vp.id}-${vp.validatedZone}`} className="border-b hover:bg-green-50">
-                        <td className="p-4">{vp.nom}</td>
+                      <tr key={`${vp.id}-${vp.zoneId || vp.validatedZone}`}
+                        className="border-b hover:bg-green-50">
+                        <td className="p-4">{vp.nom || vp.name}</td>
                         <td className="p-4">{vp.codeBarre}</td>
-                        <td className="p-4">{zones.find(z => z.id === Number(vp.validatedZone))?.name || '-'}</td>
+                        <td className="p-4">{zones.find(z => z.id === Number(vp.zoneId || vp.validatedZone))?.name || '-'}</td>
+                        <td className="p-4">{(vp.quantiteValidee ?? vp.quantite) || '-'}</td>
                       </tr>
                     ))}
                     {validatedProducts.length === 0 && (
-                      <tr><td className="p-4 text-center" colSpan="3">Aucun produit validé</td></tr>
+                      <tr><td className="p-4 text-center" colSpan="4">Aucun produit validé</td></tr>
                     )}
                   </tbody>
                 </table>

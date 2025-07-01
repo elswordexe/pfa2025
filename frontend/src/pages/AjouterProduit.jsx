@@ -16,7 +16,10 @@ const AjouterProduit = () => {
     nom: '',
     description: '',
     codeBarre: '',
-    quantiteTheorique: 0,
+    reference: '',
+    prix: '',
+    unite: '',
+    quantitetheo: 0, // <-- champ aligné sur le backend
     categorieId: '',
     sousCategorieId: ''
   });
@@ -112,11 +115,15 @@ const AjouterProduit = () => {
       const payload = {
         nom: product.nom,
         description: product.description,
-        CodeBarre: product.codeBarre,
-        quantiteTheorique: product.quantiteTheorique,
+        CodeBarre: product.codeBarre, // C majuscule !
+        reference: product.reference,
+        prix: product.prix ? Number(product.prix) : undefined,
+        unite: product.unite,
+        quantitetheo: Number(product.quantitetheo), // <-- champ aligné sur le backend
         category: product.categorieId ? { id: product.categorieId } : undefined,
         subCategory: product.sousCategorieId ? { id: product.sousCategorieId } : undefined,
       };
+      console.log('Payload envoyé au backend:', payload);
       const { data, status } = await axios.post(
         'http://localhost:8080/produits/register',
         payload,
@@ -131,7 +138,10 @@ const AjouterProduit = () => {
           nom: '',
           description: '',
           codeBarre: '',
-          quantiteTheorique: 0,
+          reference: '',
+          prix: '',
+          unite: '',
+          quantitetheo: 0,
           categorieId: '',
           sousCategorieId: ''
         });
@@ -336,6 +346,27 @@ const AjouterProduit = () => {
                     onChange={(e) => setProduct({...product, codeBarre: e.target.value})}
                   />
                 </FormControl>
+                <FormControl required>
+                  <FormLabel>Référence</FormLabel>
+                  <Input
+                    placeholder="Entrer la référence du produit"
+                    variant="outlined"
+                    sx={{ bgcolor: 'background.body' }}
+                    value={product.reference}
+                    onChange={e => setProduct({ ...product, reference: e.target.value })}
+                  />
+                </FormControl>
+                <FormControl required>
+                  <FormLabel>Prix</FormLabel>
+                  <Input
+                    type="number"
+                    placeholder="Entrer le prix du produit"
+                    variant="outlined"
+                    sx={{ bgcolor: 'background.body' }}
+                    value={product.prix}
+                    onChange={e => setProduct({ ...product, prix: e.target.value })}
+                  />
+                </FormControl>
 
                 <Box sx={{ display: 'flex', gap: 2 }}>
                   <FormControl required sx={{ flex: 1 }}>
@@ -382,8 +413,8 @@ const AjouterProduit = () => {
                     <Input
                       type="number"
                       sx={{ bgcolor: 'background.body' }}
-                      value={product.quantiteTheorique}
-                      onChange={(e) => setProduct({...product, quantiteTheorique: Number(e.target.value)})}
+                      value={product.quantitetheo}
+                      onChange={(e) => setProduct({...product, quantitetheo: Number(e.target.value)})}
                     />
                   </FormControl>
                 </Box>
@@ -440,7 +471,10 @@ const AjouterProduit = () => {
                         nom: '',
                         description: '',
                         codeBarre: '',
-                        quantiteTheorique: 0,
+                        reference: '',
+                        prix: '',
+                        unite: '',
+                        quantitetheo: 0,
                         categorieId: '',
                         sousCategorieId: ''
                       });

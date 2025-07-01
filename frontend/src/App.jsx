@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Login } from "./pages/Login";
 import Dash from "./pages/Dash";
 import UserManagement from "./pages/UserManagement";
-import "./app.css"; 
+import "./App.css"; 
 import InventairePlan from "./pages/InventairePlan";
 import Inventorytest from "./pages/Inventory";
 import VerifyAccount from "./pages/VerifyAccount";

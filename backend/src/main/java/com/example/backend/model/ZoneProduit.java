@@ -23,8 +23,5 @@ public class ZoneProduit {
     private Produit produit;
 
     private Integer quantiteTheorique;
-
-    private Integer quantiteReelle;
-
     private boolean verified = false;
 }

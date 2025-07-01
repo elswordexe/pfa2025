@@ -97,23 +97,26 @@ public class PlanInventaireController {
     }
 
     @Operation(
-            summary = "Créer un plan d'inventaire",
-            description = "Créer un nouveau plan avec nom, dates, statut, zones, produits et type",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    description = "Corps de la requête pour créer un plan",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Exemple de création de plan",
-                                    value = "{\n  \"nom\": \"Inventaire trimestriel\",\n  \"dateDebut\": \"2025-01-01T08:00:00\",\n  \"dateFin\": \"2025-01-10T18:00:00\",\n  \"type\": \"COMPLET\",\n  \"recurrence\": \"MENSUEL\",\n  \"statut\": \"Planifie\",\n  \"createur\": { \"id\": 1 },\n  \"zones\": [ { \"id\": 1 }, { \"id\": 2 } ]\n}"
-                            )
-                    )
-            ),
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Plan d'inventaire créé",
-                            content = @Content(schema = @Schema(implementation = Map.class)))
-            }
+        summary = "Créer un plan d'inventaire",
+        description = "Créer un nouveau plan avec nom, dates, statut, zones, produits et type.\nChamps attendus :\n- nom (String)\n- dateDebut (String, format ISO)\n- dateFin (String, format ISO)\n- type (String: COMPLET|PARTIEL)\n- recurrence (String: MENSUEL|ANNUEL)\n- statut (String: Planifie|EN_cours|Termine|Indefini)\n- createur (objet: { id: Long, dtype: String (ADMIN_CLIENT|SUPER_ADMIN|...)} )\n- zones (array d'objets: { id: Long })\n- produits (array d'objets: { id: Long }) (optionnel pour COMPLET)",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Exemple de corps de requête pour créer un plan d'inventaire. Le champ 'createur' doit contenir l'id et le dtype (type d'utilisateur, ex: ADMIN_CLIENT, SUPER_ADMIN, etc.)",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    type = "object",
+                    example = "{\n  \"nom\": \"Inventaire trimestriel\",\n  \"dateDebut\": \"2025-01-01T08:00:00\",\n  \"dateFin\": \"2025-01-10T18:00:00\",\n  \"type\": \"COMPLET\",\n  \"recurrence\": \"MENSUEL\",\n  \"statut\": \"Planifie\",\n  \"createur\": { \"id\": 1, \"dtype\": \"ADMIN_CLIENT\" },\n  \"zones\": [ { \"id\": 1 }, { \"id\": 2 } ],\n  \"produits\": [ { \"id\": 10 }, { \"id\": 11 } ]\n}"
+                )
+            )
+        ),
+        responses = {
+            @ApiResponse(responseCode = "201", description = "Plan d'inventaire créé",
+                content = @Content(schema = @Schema(
+                    type = "object",
+                    example = "{\n  \"id\": 1,\n  \"message\": \"Plan d'inventaire créé avec succès\"\n}"
+                )))
+        }
     )
     @PostMapping
     public ResponseEntity<Map<String, Object>> createPlan(@RequestBody Map<String, Object> requestData) {
@@ -187,7 +190,7 @@ public class PlanInventaireController {
             response.put("id", savedPlan.getId());
             response.put("message", "Plan d'inventaire créé avec succès");
             
-            return ResponseEntity.ok(response);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
 
         } catch (EntityNotFoundException e) {
             return ResponseEntity.badRequest()
@@ -232,7 +235,7 @@ public class PlanInventaireController {
     }
     @Operation(summary = "assigner un agent ", description = "assigner un aplan a un agent")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "agent assigne  avec succès"),
+            @ApiResponse(responseCode = "201", description = "agent assigne  avec succès"),
             @ApiResponse(responseCode = "400", description = "failure d'assignations")
     })
     @PostMapping("{planId}/agents/{agentId}/assignations")
@@ -304,7 +307,7 @@ public class PlanInventaireController {
             }
             planInventaireRepository.save(plan);
 
-            return ResponseEntity.ok(assignationDTOs);
+            return ResponseEntity.status(HttpStatus.CREATED).body(assignationDTOs);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -357,22 +360,26 @@ public class PlanInventaireController {
     }
 
     @Operation(
-            summary = "Ajouter les zones aux plans",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    description = "Liste d'objets Zone à associer au plan",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = Zone.class),
-                            examples = @ExampleObject(
-                                    name = "Exemple de zones",
-                                    value = "[ { \"id\": 1 }, { \"id\": 2 } ]"
-                            )
-                    )
-            ),responses= {
-        @ApiResponse(responseCode = "200", description = "Zones ajoutées",
-                content = @Content(schema = @Schema(implementation = PlanInventaire.class)))
-    }
+        summary = "Ajouter les zones aux plans",
+        description = "Ajoute une ou plusieurs zones à un plan d'inventaire.\nChamps attendus : id (Long) pour chaque zone.",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Exemple de corps de requête pour ajouter des zones à un plan.",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    type = "array",
+                    example = "[ { \"id\": 1 }, { \"id\": 2 } ]"
+                )
+            )
+        ),
+        responses = {
+            @ApiResponse(responseCode = "201", description = "Zones ajoutées",
+                content = @Content(schema = @Schema(
+                    type = "array",
+                    example = "[{\"id\":1,\"name\":\"Zone A\"},{\"id\":2,\"name\":\"Zone B\"}]"
+                )))
+        }
     )
     @PostMapping("{planId}/zones")
     public ResponseEntity<?> addZonesToPlan(@PathVariable Long planId, @RequestBody List<Zone> zones) {
@@ -383,7 +390,7 @@ public class PlanInventaireController {
             plan.getZones().addAll(zones);
             PlanInventaire updatedPlan = planInventaireRepository.save(plan);
 
-            return ResponseEntity.ok(updatedPlan.getZones());
+            return ResponseEntity.status(HttpStatus.CREATED).body(updatedPlan.getZones());
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
@@ -454,22 +461,26 @@ public class PlanInventaireController {
     }
 
     @Operation(
-            summary = "Ajouter des produits au plan",
-            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    description = "Liste des produits avec les zones où ils se trouvent",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Exemple de produits & zones",
-                                    value = "[ { \"produitId\": 10, \"zoneId\": 1 }, { \"produitId\": 11, \"zoneId\": 2 } ]"
-                            )
-                    )
-            ),
-                    responses = {
-                            @ApiResponse(responseCode = "200", description = "Produits ajoutés",
-                                    content = @Content(schema = @Schema(implementation = PlanInventaire.class)))
-                    }
+        summary = "Ajouter des produits au plan",
+        description = "Ajoute des produits à un plan d'inventaire.\nChamps attendus : productId (Long), zoneIds (array de Long)",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "Exemple de corps de requête pour ajouter des produits à un plan.",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(
+                    type = "array",
+                    example = "[ { \"productId\": 10, \"zoneIds\": [1,2] }, { \"productId\": 11, \"zoneIds\": [2] } ]"
+                )
+            )
+        ),
+        responses = {
+            @ApiResponse(responseCode = "201", description = "Produits ajoutés avec succès",
+                content = @Content(schema = @Schema(
+                    type = "object",
+                    example = "{\n  \"message\": \"Produits ajoutés avec succès\",\n  \"planId\": 1,\n  \"productsAdded\": 2\n}"
+                )))
+        }
     )
     @PostMapping("{planId}/produits")
     public ResponseEntity<?> addProductsToPlan(@PathVariable Long planId, @RequestBody List<Map<String, Object>> productsWithZones) {
@@ -513,7 +524,7 @@ public class PlanInventaireController {
         produitRepository.saveAll(updatedProducts);
         planInventaireRepository.save(plan);
 
-        return ResponseEntity.ok()
+        return ResponseEntity.status(HttpStatus.CREATED)
             .body(Map.of(
                 "message", "Produits ajoutés avec succès",
                 "planId", plan.getId(),
@@ -796,6 +807,30 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
         }
         throw new IllegalArgumentException("Format de date invalide: " + input);
     }
+    @GetMapping("/{planId}/validated-products")
+    public ResponseEntity<List<Map<String, Object>>> getValidatedProducts(@PathVariable Long planId) {
+        PlanInventaire plan = planInventaireRepository.findById(planId)
+                .orElseThrow(() -> new EntityNotFoundException("Plan not found with id: " + planId));
 
+        List<Checkup> checkups = checkupRepository.findByPlanId(planId);
+        List<Map<String, Object>> validated = new ArrayList<>();
+        for (Checkup checkup : checkups) {
+            if (!checkup.isValide()) continue;
+            for (CheckupDetail detail : checkup.getDetails()) {
+                if (detail.getProduit() == null || !plan.getProduits().contains(detail.getProduit())) continue;
+                if (detail.getZone() == null) continue;
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", detail.getProduit().getId());
+                map.put("nom", detail.getProduit().getNom());
+                map.put("codeBarre", detail.getProduit().getCodeBarre());
+                map.put("validatedZone", detail.getZone().getId());
+                Integer qv = detail.getManualQuantity() != null ? detail.getManualQuantity() :
+                        (detail.getScannedQuantity() != null ? detail.getScannedQuantity() : 0);
+                map.put("quantiteValidee", qv);
+                validated.add(map);
+            }
+        }
+        return ResponseEntity.ok(validated);
+    }
 
 }

@@ -14,6 +14,7 @@ public class ProduitDTO {
     private String unite;
     private LocalDateTime datecremod;
     private String imageUrl;
+    private String imageData;
     private Integer quantitetheo;
     private SubCategoryDTO subCategoryDTO;
     private CategoryDTO category;
