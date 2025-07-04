@@ -23,6 +23,7 @@ const Analytics = () => {
   const fetchAnalytics = async (start = null, end = null) => {
     setLoading(true);
     try {
+
       const [globalRes, ecartsRes, performanceRes, timeRes] = await Promise.all([
         axios.get('http://localhost:8080/api/analytics/global-stats'),
         axios.get('http://localhost:8080/api/analytics/ecarts-stats'),
@@ -31,6 +32,12 @@ const Analytics = () => {
           params: {
             startDate: start,
             endDate: end
+          },
+          paramsSerializer: params => {
+            const searchParams = new URLSearchParams();
+            if (params.startDate) searchParams.append('startDate', params.startDate);
+            if (params.endDate) searchParams.append('endDate', params.endDate);
+            return searchParams.toString();
           }
         })
       ]);
@@ -51,25 +58,30 @@ const Analytics = () => {
   useEffect(() => {
     const now = new Date();
     let startDate;
-    
     switch (timeframe) {
       case 'week':
-        startDate = new Date(now.setDate(now.getDate() - 7));
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         break;
       case 'month':
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
+        startDate = new Date(now.getTime());
+        startDate.setMonth(now.getMonth() - 1);
         break;
       case 'quarter':
-        startDate = new Date(now.setMonth(now.getMonth() - 3));
+        startDate = new Date(now.getTime());
+        startDate.setMonth(now.getMonth() - 3);
         break;
       case 'year':
-        startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+        startDate = new Date(now.getTime());
+        startDate.setFullYear(now.getFullYear() - 1);
         break;
       default:
-        startDate = new Date(now.setMonth(now.getMonth() - 1));
+        startDate = new Date(now.getTime());
+        startDate.setMonth(now.getMonth() - 1);
     }
-    
-    fetchAnalytics(startDate.toISOString(), new Date().toISOString());
+    function formatLocalDateTime(date) {
+      return date.toISOString().slice(0, 19);
+    }
+    fetchAnalytics(formatLocalDateTime(startDate), formatLocalDateTime(new Date()));
   }, [timeframe]);
 
   const handleTimeframeChange = (_, value) => {

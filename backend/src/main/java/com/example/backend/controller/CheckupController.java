@@ -52,7 +52,7 @@ public class CheckupController {
 
     @Operation(
         summary = "Ajouter un nouveau checkup",
-        description = "Crée un nouveau checkup (manuel ou scan) à partir des données fournies dans le corps de la requête.",
+        description = "Crée un nouveau checkup (manuel ou scan ou les deux) à partir des données fournies dans le corps de la requête.",
         requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             description = "Données du checkup à créer",
@@ -62,11 +62,11 @@ public class CheckupController {
                 examples = {
                     @ExampleObject(
                         name = "Exemple de checkup manuel",
-                        value = "{\n  \"agent\": { \"id\": 2 },\n  \"plan\": { \"id\": 1 },\n  \"dateCheck\": \"2025-07-01T10:00:00\",\n  \"details\": [ { \"produit\": { \"id\": 10 }, \"zone\": { \"id\": 3 }, \"type\": \"MANUEL\", \"manualQuantity\": 5 } ]\n}"
+                        value = "{\n  \"agent\": { \"id\": 2 },\n  \"plan\": { \"id\": 1 },\n  \"details\": [ { \"produit\": { \"id\": 10 }, \"zone\": { \"id\": 3 }, \"manualQuantity\": 5 } ]\n}"
                     ),
                     @ExampleObject(
                         name = "Exemple de checkup scan",
-                        value = "{\n  \"agent\": { \"id\": 2 },\n  \"plan\": { \"id\": 1 },\n  \"dateCheck\": \"2025-07-01T10:00:00\",\n  \"details\": [ { \"produit\": { \"id\": 11 }, \"zone\": { \"id\": 3 }, \"type\": \"SCAN\", \"scannedQuantity\": 8 } ]\n}"
+                        value = "{\n  \"agent\": { \"id\": 2 },\n  \"plan\": { \"id\": 1 },\n  \"dateCheck\": \"2025-07-01T10:00:00\",\n  \"details\": [ { \"produit\": { \"id\": 11 }, \"zone\": { \"id\": 3 }, \"scannedQuantity\": 8 } ]\n}"
                     )
                 }
             )
@@ -86,10 +86,8 @@ public class CheckupController {
     @PostMapping("/ajouter")
     public ResponseEntity<?> addCheckup(@RequestBody CheckupDTO checkupDTO) {
         try {
-            // Check if a checkup already exists for this agent, plan, and zone/product
             if (checkupDTO.getDetails() != null && !checkupDTO.getDetails().isEmpty()) {
                 for (CheckupDTO.CheckupDetailDTO dtoDetail : checkupDTO.getDetails()) {
-                    // Find existing checkup for this agent, plan, product, and zone
                     List<Checkup> existingCheckups = checkupRepository.findByPlanId(checkupDTO.getPlan().getId());
                     Checkup existing = null;
                     CheckupDetail existingDetail = null;
@@ -108,7 +106,7 @@ public class CheckupController {
                         if (existing != null) break;
                     }
                     if (existing != null && existingDetail != null) {
-                        // Patch the existing detail
+  
                         if (dtoDetail.getManualQuantity() != null)
                             existingDetail.setManualQuantity(dtoDetail.getManualQuantity());
                         if (dtoDetail.getScannedQuantity() != null)
@@ -119,7 +117,6 @@ public class CheckupController {
                     }
                 }
             }
-            // If not found, create new checkup as before
             Checkup checkup = convertToEntity(checkupDTO);
             if (checkupDTO.getDetails() != null && checkup.getDetails() != null) {
                 for (int i = 0; i < checkupDTO.getDetails().size(); i++) {
@@ -139,14 +136,14 @@ public class CheckupController {
     }
     @Operation(
             summary = "Obtenir les checkups par plan et type",
-            description = "Retourne les checkups associés à un plan donné, filtrés par type (`SCAN`, `MANUEL`, etc.)."
+            description = "Retourne les checkups associés à un plan donné"
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Liste des checkups récupérée avec succès",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = Checkup.class)))),
             @ApiResponse(responseCode = "500", description = "Erreur interne du serveur")
     })
-    @GetMapping("/plan/{planId}/type/{type}")
+    @GetMapping("/plan/{planId}/type/ALL")
     public ResponseEntity<List<CheckupDTO>> getCheckupsByPlan(
             @PathVariable Long planId) {
         try {
@@ -247,6 +244,9 @@ public class CheckupController {
             PlanInventaire plan = checkup.getPlan();
             if (plan.getProduits().isEmpty()) {
                 plan.setStatut(STATUS.valueOf("Termine"));
+                planInventaireRepository.save(plan);
+            }else{
+                plan.setStatut(STATUS.valueOf("EN_cours"));
                 planInventaireRepository.save(plan);
             }
             return ResponseEntity.ok().build();

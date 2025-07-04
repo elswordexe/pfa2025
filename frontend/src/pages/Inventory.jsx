@@ -30,7 +30,7 @@ const Inventory = () => {
   const [justification, setJustification] = useState('');
   const [selectedZone, setSelectedZone] = useState('');
   const [zones, setZones] = useState([]);
-  const [activeTab, setActiveTab] = useState('products'); 
+  const [activeTab, setActiveTab] = useState('products');
   const [showPDF, setShowPDF] = useState(false);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -39,11 +39,7 @@ const Inventory = () => {
   const userRole = getRoleFromToken();
   const [manualQuantities, setManualQuantities] = useState({});
 
-  // Validated products are now saved to localStorage for temporary persistence
-  const [validatedProducts, setValidatedProducts] = useState(() => {
-    const stored = localStorage.getItem('validatedProducts');
-    return stored ? JSON.parse(stored) : [];
-  });
+  const [validatedProducts, setValidatedProducts] = useState([]);
 
   useEffect(() => {
     const fetchPlans = async () => {
@@ -86,6 +82,8 @@ const Inventory = () => {
       const firstId = availablePlans[0].id;
       setPlanId(firstId);
       localStorage.setItem('selectedPlanId', firstId);
+    } else if (planId != null && availablePlans.length > 0) {
+      silentUpdate();
     }
   }, [availablePlans, planId]);
 
@@ -101,6 +99,9 @@ const Inventory = () => {
         const allZones = zonesRes.data || [];
         const planRes = await axios.get(`http://localhost:8080/api/plans/${planId}/details`);
         const zoneProductsRes = await axios.get(`http://localhost:8080/api/plans/${planId}/zone-products`);
+        const validatedRes = await axios.get(`http://localhost:8080/api/plans/${planId}/validated-products`);
+        const validated = validatedRes.data || [];
+        setValidatedProducts(validated);
         const zones = allZones;
         const zoneProducts = zoneProductsRes.data || {};
         const productsWithZones = Object.entries(zoneProducts).reduce((acc, [zoneId, products = []]) => {
@@ -127,7 +128,7 @@ const Inventory = () => {
           return acc;
         }, []);
         const filtered = productsWithZones.flatMap(p => {
-          const validatedForProduct = validatedProducts.filter(vp => vp.id === p.id);
+          const validatedForProduct = validated.filter(vp => vp.id === p.id);
           if (validatedForProduct.length === 0) return [p];
           const remainingZones = p.zones.filter(z => !validatedForProduct.some(vp => Number(vp.validatedZone) === z.id));
           if (remainingZones.length === 0) return [];
@@ -220,7 +221,7 @@ const Inventory = () => {
       );
 
       const response = await axios.put(
-        `http://localhost:8080/checkups/${selectedCheckupId}/recomptage`, 
+        `http://localhost:8080/checkups/${selectedCheckupId}/recomptage`,
         {
           justification: justification,
           demandeRecomptage: true
@@ -239,7 +240,7 @@ const Inventory = () => {
         });
       }
 
-      await silentUpdate();
+      await silentUpdate(); // Silent update après recomptage
       await refreshCheckups();
 
       setShowJustificationModal(false);
@@ -265,37 +266,13 @@ const Inventory = () => {
       toast.error('Zone non trouvée');
       return;
     }
-
+    
     const validateProduct = async (finalQty) => {
       try {
-        toast.info('Validation en cours...', {
-          toastId: 'validating'
+        toast.info('Validation en cours...', { toastId: 'validating' });
+        await axios.put(`http://localhost:8080/api/plans/${planId}/produits/${produitId}/zones/${currentZone}/valider`, {
+          quantiteValidee: finalQty
         });
-
-        setPlanProducts(prev => prev.flatMap(p => {
-          if (p.id !== produitId) return [p];
-
-          const remainingZones = p.zones.filter(z => z.id !== Number(currentZone));
-          const updatedZoneQuantities = { ...p.zoneQuantities };
-          delete updatedZoneQuantities[currentZone];
-
-          if (remainingZones.length === 0) {
-            return [];
-          }
-          return [{ ...p, zones: remainingZones, zoneQuantities: updatedZoneQuantities }];
-        }));
-
-        // Add validated product to localStorage
-        setValidatedProducts(prev => [
-          ...prev,
-          {
-            id: produitId,
-            nom: planproducts.find(p => p.id === produitId)?.nom,
-            codeBarre: planproducts.find(p => p.id === produitId)?.codeBarre,
-            validatedZone: currentZone,
-            quantiteValidee: finalQty
-          }
-        ]);
 
         if (checkupId) {
           await axios.put(`http://localhost:8080/checkups/${checkupId}/valider`);
@@ -303,21 +280,13 @@ const Inventory = () => {
 
         toast.success('Produit validé', { toastId: 'checkup-validated' });
 
-        await refreshCheckups();
+        let url = `http://localhost:8080/api/plans/${planId}/validated-products`;
+        if (selectedZone) {
+          url += `?zoneId=${selectedZone}`;
+        }
+        const res = await axios.get(url);
+        setValidatedProducts(res.data || []);
         await silentUpdate();
-
-        if (planproducts.find(p => p.id === produitId)?.zones.length === 1) {
-          try { await axios.delete(`http://localhost:8080/api/plans/${planId}/produits/${produitId}`); } catch {}
-        }
-
-        try {
-          await axios.put(`http://localhost:8080/produits/${produitId}/zones/${currentZone}/updateQuantite`, {
-            quantiteTheorique: finalQty,
-            status: 'VERIFIE'
-          });
-        } catch (qErr) {
-          console.error('Erreur mise à jour quantité:', qErr);
-        }
       } catch (error) {
         console.error('Error validating product:', error);
         toast.error('Erreur lors de la validation');
@@ -351,21 +320,60 @@ const Inventory = () => {
       await validateProduct(manual);
     }
   };
-  const getQuantityColor = (scannedQty, manualQty, theoreticalQty) => {
-    const scanned = Number(scannedQty);
-    const manual = Number(manualQty);
-    const theoretical = Number(theoreticalQty);
-
-    if (scanned === manual && manual === theoretical) {
-      return 'bg-green-100 text-green-800 border-green-200';
-    } else if (scanned !== manual) {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-    } else if (scanned !== theoretical || manual !== theoretical) {
-      return 'bg-red-100 text-red-800 border-red-200';
-    }
-    return 'bg-blue-100 text-blue-800 border-blue-200';
+const getQuantityColor = (scannedQty, manualQty, theoreticalQty) => {
+  const scanned = Number(scannedQty);
+  const manual = Number(manualQty);
+  const theoretical = Number(theoreticalQty);
+  const red = 'bg-red-100 text-red-800 border-red-200';
+  const green = 'bg-green-100 text-green-800 border-green-200';
+  const yellow = 'bg-yellow-100 text-yellow-800 border-yellow-200';
+  const defaultColor = '';
+  let ecartbg = defaultColor;
+  let theoreticalbg = defaultColor;
+  if ( manual < theoretical) {
+    ecartbg = red;
+  } else if (scanned > theoretical || manual > theoretical) {
+    ecartbg = green;
+  }
+  if (scanned === manual && manual === theoretical) {
+    return {
+      scanbg: green,
+      manualbg: green,
+      theoreticalbg: green,
+      ecartbg,
+    };
+  }
+  if (scanned !== manual && manual === theoretical) {
+    return {
+      scanbg: yellow,
+      manualbg: green,
+      theoreticalbg: green,
+      ecartbg,
+    };
+  }
+  if (manual !== scanned && scanned === theoretical) {
+    return {
+      scanbg: green,
+      manualbg: yellow,
+      theoreticalbg: green,
+      ecartbg,
+    };
+  }
+  if (theoretical !== scanned && scanned === manual) {
+    return {
+      scanbg: green,
+      manualbg: green,
+      theoreticalbg: red,
+      ecartbg,
+    };
+  }
+  return {
+    scanbg: red,
+    manualbg: red,
+    theoreticalbg,
+    ecartbg,
   };
-
+};
   useEffect(() => {
     if (planproducts.length > 0) {
       console.log('Current products:', planproducts);
@@ -386,29 +394,19 @@ const Inventory = () => {
   useEffect(() => {
     const initialLoad = async () => {
       if (!planId) return;
-      
       try {
         setLoading(true);
-        const [productsRes, scanRes, manualRes] = await Promise.all([
-          axios.get(`http://localhost:8080/api/plans/${planId}/produits`),
-          axios.get(`http://localhost:8080/checkups/scan/plan/${planId}`),
-          axios.get(`http://localhost:8080/checkups/manual/plan/${planId}`)
-        ]);
-
-      
-        setPlanProducts(updatedProducts);
-        setScanCheckups(scanRes.data);
-        setManualCheckups(manualRes.data);
+        const productsRes = await axios.get(`http://localhost:8080/api/plans/${planId}/produits`);
+        setPlanProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
       } catch (error) {
         console.error('Error fetching inventory data:', error);
         toast.error('Erreur lors du chargement des données');
+        setPlanProducts([]);
       } finally {
         setLoading(false);
       }
     };
     initialLoad();
-   // const interval = setInterval(silentUpdate, 5000);
-    //return () => clearInterval(interval);
   }, [planId]);
 
   const refreshData = async () => {
@@ -417,37 +415,11 @@ const Inventory = () => {
 
   const silentUpdate = async () => {
     try {
-      const [productsRes, scanRes, manualRes] = await Promise.all([
-        axios.get(`http://localhost:8080/api/plans/${planId}/produits`),
-        axios.get(`http://localhost:8080/checkups/scan/plan/${planId}`),
-        axios.get(`http://localhost:8080/checkups/manual/plan/${planId}`)
-      ]);
-
-      const updatedProducts = productsRes.data;
-      const filteredUpdated = updatedProducts.flatMap(p => {
-        const validatedForProduct = validatedProducts.filter(vp => vp.id === p.id);
-        if (validatedForProduct.length === 0) return [p];
-        const remainingZones = p.zones.filter(z => !validatedForProduct.some(vp => Number(vp.validatedZone) === z.id));
-        if (remainingZones.length === 0) return [];
-        const updatedZoneQuantities = { ...p.zoneQuantities };
-        validatedForProduct.forEach(vp => { delete updatedZoneQuantities[vp.validatedZone]; });
-        return [{ ...p, zones: remainingZones, zoneQuantities: updatedZoneQuantities }];
-      });
-
-      setPlanProducts(prevProducts => {
-        const hasChanged = JSON.stringify(prevProducts) !== JSON.stringify(filteredUpdated);
-        return hasChanged ? filteredUpdated : prevProducts;
-      });
-      setScanCheckups(prevCheckups => {
-        const hasChanged = JSON.stringify(prevCheckups) !== JSON.stringify(scanRes.data);
-        return hasChanged ? scanRes.data : prevCheckups;
-      });
-      setManualCheckups(prevCheckups => {
-        const hasChanged = JSON.stringify(prevCheckups) !== JSON.stringify(manualRes.data);
-        return hasChanged ? manualRes.data : prevCheckups;
-      });
+      const productsRes = await axios.get(`http://localhost:8080/api/plans/${planId}/produits`);
+      setPlanProducts(Array.isArray(productsRes.data) ? productsRes.data : []);
     } catch (error) {
       console.error('Error updating data:', error);
+      setPlanProducts([]);
     }
   };
 
@@ -475,17 +447,22 @@ const Inventory = () => {
     });
   }
 
-  // Save validated products to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem('validatedProducts', JSON.stringify(validatedProducts));
-  }, [validatedProducts]);
-
-  // Load validated products from localStorage when planId changes
   useEffect(() => {
     if (!planId) return;
-    const stored = localStorage.getItem('validatedProducts');
-    setValidatedProducts(stored ? JSON.parse(stored) : []);
-  }, [planId]);
+    const fetchValidatedProducts = async () => {
+      try {
+        let url = `http://localhost:8080/api/plans/${planId}/validated-products`;
+        if (selectedZone) {
+          url += `?zoneId=${selectedZone}`;
+        }
+        const res = await axios.get(url);
+        setValidatedProducts(res.data || []);
+      } catch (err) {
+        setValidatedProducts([]);
+      }
+    };
+    fetchValidatedProducts();
+  }, [planId, selectedZone]);
 
   const handleScan = async (checkupId, produitId, zoneId, quantity = 1) => {
     try {
@@ -519,9 +496,9 @@ const Inventory = () => {
         return;
       }
 
-      const relevantCheckup = scanCheckups.find(checkup => 
-        checkup.details.some(detail => 
-          detail.produit.id === product.id && 
+      const relevantCheckup = scanCheckups.find(checkup =>
+        checkup.details.some(detail =>
+          detail.produit.id === product.id &&
           detail.zone.id === selectedZone.id
         )
       );
@@ -530,7 +507,7 @@ const Inventory = () => {
         toast.error('Aucun contrôle trouvé pour ce produit dans cette zone');
         return;
       }
-       
+
       await handleScan(
         relevantCheckup.id,
         product.id,
@@ -587,7 +564,7 @@ const Inventory = () => {
               <h3 className="text-xl font-semibold text-red-700 mb-2">Erreur de chargement</h3>
               <p className="text-gray-600">Les données ne sont pas disponibles pour le moment.</p>
               <p className="text-sm text-gray-500 mt-2">Détails: {error}</p>
-              <button 
+              <button
                 onClick={() => window.location.reload()}
                 className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center justify-center mx-auto"
               >
@@ -617,7 +594,7 @@ const Inventory = () => {
         pauseOnHover
         theme="colored"
       />
-      
+
       <div className="flex-1 min-w-0 overflow-x-hidden">
         <div className="p-4 md:p-6">
           <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
@@ -632,7 +609,7 @@ const Inventory = () => {
                 </h1>
                 <p className="text-gray-600 mt-2">Gestion des écarts et validation des produits</p>
               </div>
-              
+
               <div className="flex flex-wrap gap-3 mt-4 md:mt-0">
                 <button
                   onClick={handleExportPDF}
@@ -644,7 +621,7 @@ const Inventory = () => {
                   Export PDF
                 </button>
                 <button
-                  onClick={() => exportProductsToExcel(planproducts, `inventaire_plan_${planId}.xlsx`)}
+                  onClick={() => exportProductsToExcel(planproducts, `inventaire_plan_${planId}.xlsx`, validatedProducts)}
                   className="flex items-center gap-2 bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg shadow-md transition"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,7 +631,7 @@ const Inventory = () => {
                 </button>
               </div>
             </div>
-            
+
             <div className="flex flex-wrap gap-4 items-center justify-between mb-6 p-4 bg-blue-50 rounded-xl">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex flex-col">
@@ -686,7 +663,7 @@ const Inventory = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-sm font-medium text-gray-700 mb-1">Filtrer par zone</label>
                   <div className="relative">
@@ -711,7 +688,7 @@ const Inventory = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex flex-col w-full md:w-auto">
                 <label className="text-sm font-medium text-gray-700 mb-1">Rechercher un produit</label>
                 <div className="relative">
@@ -730,69 +707,66 @@ const Inventory = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="mb-6">
               <div className="flex border-b border-gray-200">
                 <button
-                  className={`py-2 px-4 font-medium text-sm border-b-2 -mb-px transition ${
-                    activeTab === 'products' 
-                      ? 'border-blue-600 text-blue-600' 
+                  className={`py-2 px-4 font-medium text-sm border-b-2 -mb-px transition ${activeTab === 'products'
+                      ? 'border-blue-600 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                    }`}
                   onClick={() => setActiveTab('products')}
                 >
                   Vue par produit
                 </button>
                 <button
-                  className={`py-2 px-4 font-medium text-sm border-b-2 -mb-px transition ${
-                    activeTab === 'zones' 
-                      ? 'border-blue-600 text-blue-600' 
+                  className={`py-2 px-4 font-medium text-sm border-b-2 -mb-px transition ${activeTab === 'zones'
+                      ? 'border-blue-600 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                    }`}
                   onClick={() => setActiveTab('zones')}
                 >
                   Vue par zone
                 </button>
                 <button
-                  className={`py-2 px-4 font-medium text-sm border-b-2 -mb-px transition ${
-                    activeTab === 'validated' 
-                      ? 'border-green-600 text-green-600' 
+                  className={`py-2 px-4 font-medium text-sm border-b-2 -mb-px transition ${activeTab === 'validated'
+                      ? 'border-green-600 text-green-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
+                    }`}
                   onClick={() => setActiveTab('validated')}
                 >
                   Produits validés
                 </button>
               </div>
             </div>
-            
+
             {activeTab === 'products' ? (
               <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white"><tr>
-                      <th className="p-4 text-left">Produit</th>
-                      <th className="p-4 text-left">Référence</th>
-                      <th className="p-4 text-left">Zone</th>
-                      <th className="p-4 text-right">Qté Théorique</th>
-                      <th className="p-4 text-right">Manuel</th>
-                      <th className="p-4 text-right">Scan</th>
-                      <th className="p-4 text-center">Écart</th>
-                    </tr>
+                    <th className="p-4 text-left">Produit</th>
+                    <th className="p-4 text-left">Référence</th>
+                    <th className="p-4 text-left">Zone</th>
+                    <th className="p-4 text-right">Qté Théorique</th>
+                    <th className="p-4 text-right">Manuel</th>
+                    <th className="p-4 text-right">Scan</th>
+                    <th className="p-4 text-center">Écart</th>
+                  </tr>
                   </thead>
                   <tbody>
                     {planproducts
                       .filter(product => !selectedZone || product.zones.some(z => z.id.toString() === selectedZone))
-                      .filter(product => 
-                        !filter || 
+                      .filter(product =>
+                        !filter ||
                         product.nom?.toLowerCase().includes(filter.toLowerCase()) ||
                         product.codeBarre?.toLowerCase().includes(filter.toLowerCase())
                       )
                       .map(product => {
 
-                        
+
                         let zoneIds = product.zones.map(z => z.id);
                         let usedZoneId = selectedZone ? Number(selectedZone) : (zoneIds.length === 1 ? zoneIds[0] : null);
-                        
+
                         let manual = "-";
                         let scanned = "-";
                         if (usedZoneId) {
@@ -823,29 +797,29 @@ const Inventory = () => {
                           scanned = foundScanned ? scannedSum : "-";
                         }
 
-                        const theoreticalQty = selectedZone 
+                        const theoreticalQty = selectedZone
                           ? getZoneQuantity(selectedZone, product)
                           : product.zones.reduce((sum, zone) => sum + getZoneQuantity(zone.id, product), 0);
-                        const colorClass = getQuantityColor(scanned, manual, theoreticalQty);
+                        const { scanbg, manualbg, theoreticalbg,ecartbg } = getQuantityColor(scanned, manual, theoreticalQty);
                         const zoneNames = product.zones?.map(z => z?.name).filter(Boolean).join(', ') || '-';
 
                         return (
-                          <tr key={product.id} className="border-b hover:bg-blue-50 transition">                           
-                           <td className="p-4 font-medium text-gray-800">{product.nom || '-'}</td>
+                          <tr key={product.id} className="border-b hover:bg-blue-50 transition">
+                            <td className="p-4 font-medium text-gray-800">{product.nom || '-'}</td>
                             <td className="p-4 text-blue-600 font-mono">{product.codeBarre || '-'}</td>
                             <td className="p-4 text-gray-600">
-                              {product.zones && product.zones.length > 0 ? 
+                              {product.zones && product.zones.length > 0 ?
                                 product.zones.map(zone => {
                                   if (!zone) return '-';
                                   const zoneName = zone.nom || zone.name || zone.designation || '-';
                                   return zoneName;
-                                }).join(', ') 
+                                }).join(', ')
                                 : '-'}
                             </td>
-                            <td className={`p-4 text-right font-medium ${colorClass}`}>
+                            <td className={`p-4 text-right font-medium ${theoreticalbg}`}>
                               {theoreticalQty}
                             </td>
-                            <td className={`p-4 text-right font-bold ${colorClass}`}>
+                            <td className={`p-4 text-right font-bold ${manualbg}`}>
                               <input
                                 type="number"
                                 min="0"
@@ -874,26 +848,26 @@ const Inventory = () => {
                                     } catch (err) {
                                       toast.error('Erreur lors de la mise à jour de la quantité manuelle');
                                     }
-                                  } 
+                                  }
                                 }}
                                 className="w-20 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 placeholder="-"
                                 disabled={userRole === 'ADMIN_CLIENT' || userRole === 'SUPER_ADMIN'}
                               />
                             </td>
-                            <td className={`p-4 text-right font-bold ${colorClass}`}>
+                            <td className={`p-4 text-right font-bold ${scanbg}`}>
                               {scanned}
                             </td>
-                            <td className="p-4 text-center">                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${colorClass}`}>
-                                {manual !== "-" ? manual - theoreticalQty : "-"}
-                              </span>
+                            <td className="p-4 text-center">                              <span className={`px-3 py-1 rounded-full text-sm font-medium ${ecartbg}`}>
+                              {manual !== "-" ? manual - theoreticalQty : "-"}
+                            </span>
                             </td>
                           </tr>
                         );
                       })}
                   </tbody>
                 </table>
-                
+
                 {planproducts.length === 0 && (
                   <div className="text-center py-12">
                     <div className="inline-block p-4 bg-blue-100 rounded-full mb-4">
@@ -911,7 +885,7 @@ const Inventory = () => {
                 {zones
                   .filter(zone => !selectedZone || zone.id.toString() === selectedZone)
                   .map(zone => {
-                    const zoneProducts = planproducts.filter(product => 
+                    const zoneProducts = planproducts.filter(product =>
                       product.zones.some(z => z.id === zone.id)
                     );
 
@@ -933,7 +907,7 @@ const Inventory = () => {
                             </span>
                           </div>
                         </div>
-                        
+
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead className="bg-gray-100">
@@ -949,7 +923,7 @@ const Inventory = () => {
                             </thead>
                             <tbody>
                               {zoneProducts
-                                .filter(product => !filter || 
+                                .filter(product => !filter ||
                                   product.nom.toLowerCase().includes(filter.toLowerCase()) ||
                                   product.codeBarre.toLowerCase().includes(filter.toLowerCase())
                                 )
@@ -964,20 +938,20 @@ const Inventory = () => {
                                     scanned = detail.scannedQuantity !== undefined && detail.scannedQuantity !== null ? Number(detail.scannedQuantity) : "-";
                                     checkupId = detail.checkupId || null;
                                   }
-                                  const zoneProduit = zone.zoneProduits?.find(zp => 
+                                  const zoneProduit = zone.zoneProduits?.find(zp =>
                                     zp.id.produitId === product.id && zp.id.zoneId === zone.id
                                   );
                                   const theoreticalQty = zoneProduit?.quantiteTheorique || 0;
-                                  const colorClass = getQuantityColor(scanned, manual, theoreticalQty);
+                                  const { scanbg, manualbg, theoreticalbg,ecartbg } = getQuantityColor(scanned, manual, theoreticalQty);
 
                                   return (
                                     <tr key={product.id} className="border-b hover:bg-blue-50">
                                       <td className="p-3 font-medium text-gray-800">{product.nom}</td>
                                       <td className="p-3 text-blue-600 font-mono">{product.codeBarre}</td>
-                                      <td className={`p-3 text-right font-medium ${colorClass} border-l-4`}>
+                                      <td className={`p-3 text-right font-medium ${theoreticalbg}`}>
                                         {theoreticalQty}
                                       </td>
-                                      <td className={`p-3 text-right font-bold ${colorClass}`}>
+                                      <td className={`p-3 text-right font-bold ${manualbg}`}>
                                         <input
                                           type="number"
                                           min="0"
@@ -1004,18 +978,18 @@ const Inventory = () => {
                                               } catch (err) {
                                                 toast.error('Erreur lors de la mise à jour de la quantité manuelle');
                                               }
-                                            } 
+                                            }
                                           }}
                                           className="w-20 px-2 py-1 border border-gray-300 rounded text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                           placeholder="-"
                                           disabled={userRole === 'ADMIN_CLIENT' || userRole === 'SUPER_ADMIN'}
                                         />
                                       </td>
-                                      <td className={`p-3 text-right font-bold ${colorClass}`}>
+                                      <td className={`p-3 text-right font-bold ${scanbg}`}>
                                         {scanned}
                                       </td>
                                       <td className="p-3 text-center">
-                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${colorClass}`}>
+                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${ecartbg}`}>
                                           {manual !== "-" ? manual - theoreticalQty : "-"}
                                         </span>
                                       </td>
@@ -1038,20 +1012,19 @@ const Inventory = () => {
                                                   zone.id
                                                 );
                                               }}
-                                              disabled={product.status === 'VERIFIE' || (!manual && !scanned) }
-                                              className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition ${
-                                                product.status === 'VERIFIE'
+                                              disabled={product.status === 'VERIFIE' || (!manual && !scanned)}
+                                              className={`flex items-center gap-1 px-3 py-1.5 rounded text-sm font-medium transition ${product.status === 'VERIFIE'
                                                   ? 'bg-gray-300 cursor-not-allowed text-gray-600'
                                                   : (!manual && !scanned)
-                                                  ? 'bg-gray-400 cursor-not-allowed text-gray-200'
-                                                  : 'bg-green-600 hover:bg-green-700 text-white'
-                                              }`}
+                                                    ? 'bg-gray-400 cursor-not-allowed text-gray-200'
+                                                    : 'bg-green-600 hover:bg-green-700 text-white'
+                                                }`}
                                               title={
                                                 product.status === 'VERIFIE'
                                                   ? 'Produit déjà vérifié'
                                                   : (!manual && !scanned)
-                                                  ? 'Aucune quantité disponible'
-                                                  : 'Valider ce produit'
+                                                    ? 'Aucune quantité disponible'
+                                                    : 'Valider ce produit'
                                               }
                                             >
                                               {product.status === 'VERIFIE' ? (
@@ -1066,13 +1039,13 @@ const Inventory = () => {
                                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                                   </svg>
-                                                  { (manual !== "-" && scanned !== "-") ? 'Valider' : 'Non disponible'}
+                                                  {(manual !== "-" && scanned !== "-") ? 'Valider' : 'Non disponible'}
                                                 </>
                                               )}
                                             </button>
                                             <button
                                               onClick={() => {
-                                                const manualDetail = manualCheckups.find(checkup => 
+                                                const manualDetail = manualCheckups.find(checkup =>
                                                   checkup.details.some(detail => detail.zone?.id === zone.id)
                                                 );
                                                 if (manualDetail) {
@@ -1083,10 +1056,10 @@ const Inventory = () => {
                                                 }
                                               }}
                                               className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-sm font-medium transition"
-                                              disabled={!manualCheckups.some(checkup => 
+                                              disabled={!manualCheckups.some(checkup =>
                                                 checkup.details.some(detail => detail.zone?.id === zone.id)
                                               )}
-                                              title={!manualCheckups.some(checkup => 
+                                              title={!manualCheckups.some(checkup =>
                                                 checkup.details.some(detail => detail.zone?.id === zone.id)
                                               ) ? 'Recomptage non disponible pour ce produit' : 'Recompter'}
                                             >
@@ -1117,39 +1090,58 @@ const Inventory = () => {
                       <th className="p-4 text-left">Référence</th>
                       <th className="p-4 text-left">Zone validée</th>
                       <th className="p-4 text-left">Quantité validée</th>
+                      <th className="p-4 text-left">Qté avant validation</th>
+                      <th className="p-4 text-left">Écart</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {validatedProducts.map(vp => (
-                      <tr key={`${vp.id}-${vp.zoneId || vp.validatedZone}`}
-                        className="border-b hover:bg-green-50">
-                        <td className="p-4">{vp.nom || vp.name}</td>
-                        <td className="p-4">{vp.codeBarre}</td>
-                        <td className="p-4">{zones.find(z => z.id === Number(vp.zoneId || vp.validatedZone))?.name || '-'}</td>
-                        <td className="p-4">{(vp.quantiteValidee ?? vp.quantite) || '-'}</td>
-                      </tr>
-                    ))}
+                    {validatedProducts.map(vp => {
+                      const quantiteValidee = (vp.quantiteValidee ?? vp.quantite);
+                      const quantiteAvant = vp.oldQuantiteAvant !== undefined ? vp.oldQuantiteAvant : (vp.quantiteAvantValidation !== undefined ? vp.quantiteAvantValidation : (vp.quantiteAvant !== undefined ? vp.quantiteAvant : (vp.quantiteAvantValidation === 0 ? 0 : undefined)));
+                      let ecart = '-';
+                      if (quantiteValidee !== undefined && quantiteValidee !== '-' && quantiteAvant !== undefined && quantiteAvant !== '-') {
+                        ecart = Number(quantiteValidee) - Number(quantiteAvant);
+                      }
+                      return (
+                        <tr key={`${vp.id}-${vp.zoneId || vp.validatedZone}`}
+                          className="border-b hover:bg-green-50">
+                          <td className="p-4">{vp.nom || vp.name}</td>
+                          <td className="p-4">{vp.codeBarre}</td>
+                          <td className="p-4">{zones.find(z => z.id === Number(vp.zoneId || vp.validatedZone))?.name || '-'}</td>
+                          <td className="p-4">{quantiteValidee ?? '-'}</td>
+                          <td className="p-4">{quantiteAvant !== undefined ? quantiteAvant : '-'}</td>
+                          <td className={
+                            `p-4 font-bold ` +
+                            (ecart !== '-' && !isNaN(ecart)
+                              ? (ecart > 0 ? 'text-green-600' : (ecart < 0 ? 'text-red-600' : 'text-gray-800'))
+                              : 'text-gray-800')
+                          }>
+                            {ecart}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {validatedProducts.length === 0 && (
-                      <tr><td className="p-4 text-center" colSpan="4">Aucun produit validé</td></tr>
+                      <tr><td className="p-4 text-center" colSpan="6">Aucun produit validé</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
-            ):null}
-            
+            ) : null}
+
             <div className="mt-6 flex justify-between items-center">
               <div className="text-sm text-gray-600">
                 {planproducts.length} produits au total
               </div>
               <div className="flex gap-2">
-                <button 
+                <button
                   className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 >
                   Précédent
                 </button>
-                <button 
+                <button
                   className="px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                   disabled={currentPage * ITEMS_PER_PAGE >= planproducts.length}
                   onClick={() => setCurrentPage(prev => prev + 1)}
@@ -1159,7 +1151,7 @@ const Inventory = () => {
               </div>
             </div>
           </div>
-          
+
           {showJustificationModal && (
             <div className="fixed inset-0 bg-white bg-opacity-50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -1171,7 +1163,7 @@ const Inventory = () => {
                     Justification du recomptage
                   </h3>
                 </div>
-                
+
                 <div className="p-6">
                   <p className="text-gray-600 mb-4">
                     Veuillez expliquer les raisons nécessitant un recomptage pour ce produit.
@@ -1183,7 +1175,7 @@ const Inventory = () => {
                     placeholder="Décrivez les raisons du recomptage..."
                   />
                 </div>
-                
+
                 <div className="flex justify-end gap-3 p-6 bg-gray-50">
                   <button
                     onClick={() => {
@@ -1210,37 +1202,33 @@ const Inventory = () => {
                 <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5">
                   <h3 className="text-xl font-semibold text-white flex items-center">
                     <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
-                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                     Exporter en PDF
                   </h3>
                 </div>
-                
                 <div className="p-6">
-                  <InventoryPDF 
+                  <InventoryPDF
                     planId={planId}
-                    zones={zones.map(zone => {
-                      const unvalidated = planproducts.filter(p => p.zones.some(z => z.id === zone.id));
-                      const alreadyValidated = validatedProducts.filter(vp => Number(vp.validatedZone) === zone.id);
-                      const zoneProduits = [
-                        ...unvalidated.map(product => {
-                          const scanDetails = scanCheckups.flatMap(s => s.details).filter(d => d.produit?.id === product.id && d.zone?.id === zone.id);
-                          const manualDetails = manualCheckups.flatMap(m => m.details).filter(d => d.produit?.id === product.id && d.zone?.id === zone.id);
+                    zones={
+                      zones
+                        .map(zone => {
+                          const validatedZoneProducts = validatedProducts.filter(vp => (vp.zoneId || vp.validatedZone) == zone.id);
+                          if (validatedZoneProducts.length === 0) return null;
+                          const zoneProduits = validatedZoneProducts.map(vp => {
+                            const full = planproducts.find(p => p.id === vp.id);
+                            return full ? { ...full, ...vp } : vp;
+                          });
                           return {
-                            ...product,
-                            quantiteManuelle: manualDetails[0]?.manualQuantity ?? manualDetails[0]?.scannedQuantity ?? null,
-                            quantiteScan: scanDetails[0]?.scannedQuantity ?? null,
-                            quantiteTheorique: product.zoneQuantities[zone.id] || 0,
+                            ...zone,
+                            zoneProduits
                           };
-                        }),
-                        ...alreadyValidated,
-                      ];
-                      return { ...zone, zoneProduits };
-                    })}
+                        })
+                        .filter(Boolean)
+                    }
+                    validatedProducts={validatedProducts}
                   />
                 </div>
-                
                 <div className="flex justify-end gap-3 p-6 bg-gray-50">
                   <button
                     onClick={() => setShowPDF(false)}

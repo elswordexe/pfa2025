@@ -31,6 +31,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { Add } from '@mui/icons-material';
 import ProductListPDF from '../components/ProductListPDF';
 import axios from 'axios';
+import ZoomableImage from '../components/ZoomableImage';
 
 const ListeProduits = () => {
   const [products, setProducts] = useState([]);
@@ -156,28 +157,41 @@ const [showPDF, setShowPDF] = useState(false);
     }));
   };
 
+  const silentRefreshProducts = async () => {
+    try {
+      let url = 'http://localhost:8080/produits';
+      const params = new URLSearchParams();
+      if (selectedCategory) params.append('categoryId', selectedCategory);
+      if (selectedSubCategory) params.append('subCategoryId', selectedSubCategory);
+      if (params.toString()) url += `?${params.toString()}`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const data = await response.json();
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (err) {
+    }
+  };
+
   const handleEditSubmit = async () => {
     try {
       let updatedProduct = { ...editingProduct };
+      const produitPayload = { ...editingProduct };
+      delete produitPayload.imageFile;
+      delete produitPayload.imagePreview;
+      const response = await axios.put(
+        `http://localhost:8080/produits/${editingProduct.id}`,
+        produitPayload,
+        { headers: authHeaders }
+      );
+      updatedProduct = response.data;
       if (editingProduct.imageFile) {
         const formData = new FormData();
-        Object.entries(editingProduct).forEach(([key, value]) => {
-          if (key !== 'imageFile') formData.append(key, value);
-        });
         formData.append('image', editingProduct.imageFile);
-        const response = await axios.put(
-          `http://localhost:8080/produits/${editingProduct.id}`,
+        await axios.put(
+          `http://localhost:8080/produits/${editingProduct.id}/image`,
           formData,
-          { headers: { ...authHeaders, 'Content-Type': 'multipart/form-data' } }
+          { headers: { ...authHeaders } }
         );
-        updatedProduct = response.data;
-      } else {
-        const response = await axios.put(
-          `http://localhost:8080/produits/${editingProduct.id}`,
-          editingProduct,
-          { headers: authHeaders }
-        );
-        updatedProduct = response.data;
       }
       setProducts(products.map(p =>
         p.id === updatedProduct.id ? updatedProduct : p
@@ -185,6 +199,7 @@ const [showPDF, setShowPDF] = useState(false);
       setEditModalOpen(false);
       setEditingProduct(null);
       setEditError(null);
+      silentRefreshProducts();
     } catch (error) {
       console.error('Edit error:', error);
       setEditError(error.response?.data?.message || error.message || 'Erreur lors de la modification');
@@ -387,16 +402,21 @@ const [showPDF, setShowPDF] = useState(false);
                                       src = product.imageUrl;
                                     } else if (/^([A-Za-z0-9+/=]{100,})$/.test(product.imageUrl)) {
                                       src = `data:image/jpeg;base64,${product.imageUrl}`;
-                                    } else {
+                                    } else if (/^\/image\//.test(product.imageUrl)) {
+                                      src = `http://localhost:8080${product.imageUrl}`;
+                                    } else if (/^https?:\/\//.test(product.imageUrl)) {
                                       src = product.imageUrl;
+                                    } else {
+                                      src = '';
                                     }
                                   }
                                   return src ? (
-                                    <img
+                                    <ZoomableImage
                                       src={src}
                                       alt={product.nom}
                                       style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 8 }}
                                       onError={e => { e.target.onerror = null; e.target.src = '/placeholder.png'; }}
+                                      on
                                     />
                                   ) : (
                                     <div style={{ width: 48, height: 48, background: '#f3f4f6', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bdbdbd', fontSize: 24 }}>
@@ -550,30 +570,29 @@ const [showPDF, setShowPDF] = useState(false);
                   <FormLabel>Image</FormLabel>
                   <Input
                     type="file"
-                    name="image"
                     accept="image/*"
                     onChange={e => {
-                      if (e.target.files && e.target.files[0]) {
-                        setEditingProduct(prev => ({
-                          ...prev,
-                          imageFile: e.target.files[0]
-                        }));
-                      }
+                      const file = e.target.files[0];
+                      setEditingProduct(prev => ({
+                        ...prev,
+                        imageFile: file,
+                        imagePreview: file ? URL.createObjectURL(file) : prev.imagePreview
+                      }));
                     }}
                   />
-                  {editingProduct?.imageUrl && (() => {
-                    let src = editingProduct.imageUrl;
-                    if (typeof src === 'string') {
-                      if (/^data:image\//.test(src)) {
-                        // Already a data URL
-                      } else if (/^([A-Za-z0-9+/=]{100,})$/.test(src)) {
-                        src = `data:image/jpeg;base64,${src}`;
-                      } else if (!src.startsWith('http')) {
-                        src = '/placeholder.png';
-                      }
-                    }
-                    return <img src={src} alt="Produit" style={{ width: 80, height: 80, marginTop: 8, borderRadius: 8, objectFit: 'cover' }} onError={e => { e.target.onerror = null; e.target.src = '/placeholder.png'; }} />;
-                  })()}
+                  {editingProduct?.imageFile ? (
+                    <img
+                      src={editingProduct.imagePreview}
+                      alt="Aperçu"
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, marginTop: 8 }}
+                    />
+                  ) : editingProduct?.imageUrl || editingProduct?.imageData ? (
+                    <img
+                      src={editingProduct.imageData ? `data:image/jpeg;base64,${editingProduct.imageData}` : editingProduct.imageUrl}
+                      alt="Produit"
+                      style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, marginTop: 8 }}
+                    />
+                  ) : null}
                 </FormControl>
 
                 {editError && (
@@ -594,40 +613,7 @@ const [showPDF, setShowPDF] = useState(false);
               <Button
                 variant="solid"
                 color="primary"
-                onClick={async () => {
-                  try {
-                    let updatedProduct = { ...editingProduct };
-                    if (editingProduct.imageFile) {
-                      const formData = new FormData();
-                      Object.entries(editingProduct).forEach(([key, value]) => {
-                        if (key !== 'imageFile') formData.append(key, value);
-                      });
-                      formData.append('image', editingProduct.imageFile);
-                      const response = await axios.put(
-                        `http://localhost:8080/produits/${editingProduct.id}`,
-                        formData,
-                        { headers: { ...authHeaders, 'Content-Type': 'multipart/form-data' } }
-                      );
-                      updatedProduct = response.data;
-                    } else {
-                      const response = await axios.put(
-                        `http://localhost:8080/produits/${editingProduct.id}`,
-                        editingProduct,
-                        { headers: authHeaders }
-                      );
-                      updatedProduct = response.data;
-                    }
-                    setProducts(products.map(p =>
-                      p.id === updatedProduct.id ? updatedProduct : p
-                    ));
-                    setEditModalOpen(false);
-                    setEditingProduct(null);
-                    setEditError(null);
-                  } catch (error) {
-                    console.error('Edit error:', error);
-                    setEditError(error.response?.data?.message || error.message || 'Erreur lors de la modification');
-                  }
-                }}
+                onClick={handleEditSubmit}
               >
                 Enregistrer
               </Button>

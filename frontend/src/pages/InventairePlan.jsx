@@ -35,7 +35,7 @@ const userId = getUserIdFromToken();
     dateDebut: '',
     dateFin: '',
     type: 'COMPLET',
-    recurrence: '', // <-- add recurrence field
+    recurrence: '', 
     zones: [],
     produits: [],
     statut: 'Indefini',
@@ -104,7 +104,7 @@ const handleSubmit = async (e) => {
   dateDebut: plan.dateDebut,
   dateFin: plan.dateFin,
   type: plan.type,
-  recurrence: plan.recurrence, // <-- send recurrence
+  recurrence: plan.recurrence,
   zones: plan.zones.map(zoneId => ({
     id: typeof zoneId === 'string' ? parseInt(zoneId) : zoneId
   })),
@@ -164,7 +164,6 @@ const handleSubmit = async (e) => {
     }));
   };
 
-  // Add this effect after handleSubmit
   useEffect(() => {
     if (plan.type === 'COMPLET') {
       setPlan(prev => ({
@@ -184,7 +183,7 @@ const handleSubmit = async (e) => {
                 <FormControl className="bg-white rounded-lg p-4 border border-gray-200 hover:border-blue-500 transition-colors">
                   <FormLabel className="text-gray-700 font-medium mb-2">Nom du plan</FormLabel>
                   <Input
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500
                       focus:border-blue-500 bg-white"
                     value={plan.nom}
                     onChange={(e) => setPlan({ ...plan, nom: e.target.value })}
@@ -228,8 +227,6 @@ const handleSubmit = async (e) => {
                 </FormControl>
               </Grid>
             </Grid>
-
-            {/* Add after the type d'inventaire Grid and before the dates Grid */}
             <Grid container spacing={2} sx={{ mt: 2 }}>
               <Grid xs={12}>
                 <FormControl>
@@ -238,28 +235,6 @@ const handleSubmit = async (e) => {
                     multiple
                     value={plan.zones}
                     onChange={(e, newValue) => setPlan({ ...plan, zones: newValue })}
-                    renderValue={(selected) => (
-                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                        {selected.map((zoneId) => {
-                          const zone = zones.find(z => z.id === parseInt(zoneId));
-                          return (
-                            <Chip
-                              key={`zone-${zoneId}`} // Add unique key
-                              variant="soft"
-                              color="primary"
-                              size="sm"
-                            >
-                              {zone?.name || ''}
-                            </Chip>
-                          );
-                        })}
-                      </Box>
-                    )}
-                    slotProps={{
-                      listbox: {
-                        sx: { maxHeight: 200, overflow: 'auto' }
-                      }
-                    }}
                   >
                     {zones.map((zone) => (
                       <Option key={zone.id} value={zone.id}>
@@ -268,41 +243,6 @@ const handleSubmit = async (e) => {
                     ))}
                   </Select>
                 </FormControl>
-              </Grid>
-            </Grid>
-
-            <Grid container spacing={2} sx={{ mt: 2 }}>
-              <Grid xs={12}>
-                <Card variant="outlined" sx={{ p: 2, display: plan.zones.length ? 'block' : 'none' }}>
-                  <Typography level="title-sm" sx={{ mb: 1 }}>
-                    Zones sélectionnées ({plan.zones.length}):
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    {plan.zones.map((zoneId) => {
-                      const zone = zones.find(z => z.id === zoneId);
-                      return (
-                        <Chip
-                          key={zoneId}
-                          variant="soft"
-                          color="primary"
-                          size="md"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPlan(prev => ({
-                              ...prev,
-                              zones: prev.zones.filter(id => id !== zoneId)
-                            }));
-                          }}
-                          endDecorator={<CloseRounded />}
-                          className="bg-blue-100 text-blue-800 border border-blue-200 px-2 py-1 rounded-full text-sm font-medium"
-                        >
-                          {zone?.name}
-                        </Chip>
-                      );
-                    })}
-                  </Stack>
-                
-                </Card>
               </Grid>
             </Grid>
 
@@ -350,7 +290,6 @@ const handleSubmit = async (e) => {
                     onChange={(e) => {
                       const checked = e.target.checked;
                       setPlan(prev => {
-                        // If checked, include all products from selected zones
                         if (checked) {
                           const productsInZones = allProducts.filter(product =>
                             (product.zones || []).some(zone => plan.zones.includes(zone.id))
@@ -376,30 +315,6 @@ const handleSubmit = async (e) => {
               {plan.type !== 'COMPLET' && !plan.inclusTousProduits && (
                 <>
                   <FormControl>
-                    <Input
-                      placeholder="Rechercher des produits..."
-                      value={productFilters.searchTerm}
-                      onChange={(e) => {
-                        const searchTerm = e.target.value.toLowerCase();
-                        setProductFilters(prev => ({
-                          ...prev,
-                          searchTerm
-                        }));
-                        // Only show products from selected zones
-                        const productsInSelectedZones = allProducts.filter(product =>
-                          (product.zones || []).some(zone => plan.zones.includes(zone.id))
-                        );
-                        setFilteredProducts(
-                          productsInSelectedZones.filter(product =>
-                            product.nom.toLowerCase().includes(searchTerm) ||
-                            product.codeBarre.toLowerCase().includes(searchTerm)
-                          )
-                        );
-                      }}
-                      endDecorator={<SearchIcon />}
-                    />
-                  </FormControl>
-                  <FormControl>
                     <Select
                       multiple
                       value={plan.produits}
@@ -410,24 +325,6 @@ const handleSubmit = async (e) => {
                         }));
                         handleProductSelection(newValue);
                       }}
-                      renderValue={(selected) => (
-                        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                          {selected.map((productId) => {
-                            const product = allProducts.find(p => p.id === productId);
-                            return (
-                              <Chip
-                                key={productId}
-                                variant="soft"
-                                color="primary"
-                                size="sm"
-                                className="bg-blue-100 text-blue-800 border border-blue-200 px-2 py-1 rounded-full text-sm font-medium"
-                              >
-                                {product?.nom}
-                              </Chip>
-                            );
-                          })}
-                        </Box>
-                      )}
                     >
                       {allProducts.filter(product =>
                         (product.zones || []).some(zone => plan.zones.includes(zone.id))
@@ -441,14 +338,14 @@ const handleSubmit = async (e) => {
                 </>
               )}
             </Stack>
-            
-            <Button 
+
+            <Button
               color="primary"
               onClick={() => setStep(2)}
               disabled={
-                !plan.nom || 
-                !plan.dateDebut || 
-                !plan.dateFin || 
+                !plan.nom ||
+                !plan.dateDebut ||
+                !plan.dateFin ||
                 new Date(plan.dateFin) <= new Date(plan.dateDebut) ||
                 plan.zones.length === 0
               }
@@ -492,7 +389,7 @@ const handleSubmit = async (e) => {
               }
               navigate('/inventory');
             }}
-            className="mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg 
+            className="mt-6 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg
               hover:from-blue-700 hover:to-indigo-800 shadow-md transition inline-flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -521,8 +418,8 @@ const handleSubmit = async (e) => {
                         <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
                         <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
                       </svg>
-                      {step === 1 ? "Créer un Plan d'Inventaire" : 
-                       step === 2 ? 'Assigner les Agents' : 
+                      {step === 1 ? "Créer un Plan d'Inventaire" :
+                       step === 2 ? 'Assigner les Agents' :
                        'Plan Créé'}
                     </h1>
                     <p className="text-gray-600 mt-2">
@@ -576,8 +473,8 @@ const handleSubmit = async (e) => {
                     <button
                       onClick={step === 1 ? () => setStep(2) : handleSubmit}
                       disabled={loading || (step === 1 ? (!plan.nom || !plan.dateDebut || !plan.dateFin || plan.zones.length === 0) : !selectedAgentId)}
-                      className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg 
-                        hover:from-blue-700 hover:to-indigo-800 shadow-md transition disabled:opacity-50 
+                      className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-lg
+                        hover:from-blue-700 hover:to-indigo-800 shadow-md transition disabled:opacity-50
                         disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {loading ? (

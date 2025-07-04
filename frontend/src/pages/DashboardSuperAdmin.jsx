@@ -10,7 +10,7 @@ import Sidebar from '../components/Sidebar';
 import DashboardCardSuper from '../components/DashboardCardSuper';
 import LatestUpdates from '../components/LatestUpdatesSuper';
 
-export default function DashSuper() {
+export default function DashboardSuperAdmin() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', flexDirection: { xs: 'column', md: 'row' } }}>
       <Sidebar />

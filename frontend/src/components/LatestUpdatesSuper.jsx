@@ -7,13 +7,14 @@ function LatestList({ title, items }) {
   return (
     <Box
       sx={{
-        flex: '1 1 300px',
+        flex: '1 1 400px',
         bgcolor: 'white',
         borderRadius: 4,
         border: '1px solid #000000',
         boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
         p: 2.5,
-        minWidth: 260,
+        minWidth: 340,
+        maxWidth: 500,
         maxHeight: 400,
         overflowY: 'auto',
         display: 'flex',
@@ -128,19 +129,22 @@ export default function LatestUpdatesSuper() {
   }, []);
 
   return (
-    <Box
+     <Box
       sx={{
         display: 'flex',
-        flexWrap: 'wrap',
-        gap: 2,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        width: '100%',
+        flexDirection: { xs: 'column', md: 'row' },
+        flexWrap: 'nowrap',
+        gap: 5,
+        justifyContent: 'flex-start',
+        alignItems: 'stretch',
+        width: 'auto',
+        minWidth: 0,
+        maxWidth: '100%',
       }}
     >
-      <LatestList title="Latest Users" items={userData} />
-      <LatestList title="Latest Products" items={productData} />
-      <LatestList title="Latest Plans" items={planData} />
+      <LatestList title="Latest Users" items={userData.slice(0, 4)} />
+      <LatestList title="Latest Products" items={productData.slice(0, 4)} />
+      <LatestList title="Latest Plans" items={planData.slice(0, 4)} />
     </Box>
   );
 }

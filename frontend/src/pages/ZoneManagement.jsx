@@ -58,10 +58,12 @@ const ZoneManagement = () => {
       quantitetheo: zp.quantiteTheorique ?? zp.quantitetheo ?? 0
     }));
   };
+  const silentUpdate = async () => {
+    await Promise.all([fetchZones(), fetchAvailableProducts()]);
+  };
 
   useEffect(() => {
-    fetchZones();
-    fetchAvailableProducts();
+    silentUpdate();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -422,7 +424,8 @@ const ZoneManagement = () => {
                               type="number"
                               value={productQuantities[product.id] ?? 0}
                               onChange={(e) => {
-                                const newQty = parseInt(e.target.value) || 0;
+                                let newQty = parseInt(e.target.value);
+                                if (isNaN(newQty) || newQty < 0) newQty = 0;
                                 const oldQty = productQuantities[product.id] ?? 0;
                                 const maxAllowed = (remainingQty[product.id] ?? 0) + oldQty;
                                 const cappedQty = Math.min(newQty, maxAllowed);

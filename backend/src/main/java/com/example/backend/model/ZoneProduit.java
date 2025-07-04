@@ -1,7 +1,9 @@
 package com.example.backend.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "zone_produit")
@@ -23,5 +25,5 @@ public class ZoneProduit {
     private Produit produit;
 
     private Integer quantiteTheorique;
-    private boolean verified = false;
+
 }

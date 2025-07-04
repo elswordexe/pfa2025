@@ -15,11 +15,9 @@ import java.util.List;
 public class AgentInventaire extends Utilisateur {
     @ManyToOne
     private Client client;
-
     @JsonManagedReference(value = "agent-assignations")
     @OneToMany(mappedBy = "agent", cascade = CascadeType.ALL)
     private List<AssignationAgent> assignations;
-    
     public AgentInventaire() {
         setRole(Role.AGENT_INVENTAIRE);
     }

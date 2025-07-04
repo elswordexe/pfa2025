@@ -44,13 +44,13 @@ public class UtilisateurController {
 
     @Autowired
     private UtilisateurRepository utilisateurRepository;
-    
+
     @Autowired
     private UtilisateurService utilisateurService;
-    
+
     @Autowired
     private PasswordEncoder passwordEncoder;
-    
+
     @Operation(summary = "Lister tous les utilisateurs")
     @ApiResponses(value = {@ApiResponse(responseCode = "200",description = "lister tous les utilisateurs")})
     @GetMapping("users")
@@ -61,31 +61,100 @@ public class UtilisateurController {
     @Autowired
     private AgentService agentService;
 
-    @PostMapping("AgentInventaire/assign/{planId}/{agentId}")
-    public ResponseEntity<?> assignAgentToPlan(@PathVariable("planId") Long planId,
-                                               @PathVariable("agentId") Long agentId) {
+    @Operation(
+        summary = "Créer un utilisateur générique",
+        description = "Crée un utilisateur de n'importe quel rôle (hors clientId obligatoire).\n\n"
+            + "\u26a0\ufe0f Le corps (body) de la requête est OBLIGATOIRE et doit contenir les champs requis.\n\n"
+            + "Le champ 'role' doit être l'une des valeurs suivantes : SUPER_ADMIN, ADMIN_CLIENT, AGENT_INVENTAIRE, Utilisateur, CLIENT.\n"
+            + "Le champ 'dtype' doit correspondre à la classe Java : SuperAdministrateur, AdministrateurClient, AgentInventaire, Utilisateur, Client.\n"
+            + "Le mot de passe et l'email sont obligatoires.\n\n"
+            + "Exemple de correspondance :\n"
+            + "- role: AGENT_INVENTAIRE, dtype: AgentInventaire\n"
+            + "- role: ADMIN_CLIENT, dtype: AdministrateurClient\n"
+            + "- role: SUPER_ADMIN, dtype: SuperAdministrateur\n"
+            + "- role: Utilisateur, dtype: Utilisateur\n",
+        requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description = "\u26a0\ufe0f Ce body est OBLIGATOIRE. Fournir un objet JSON avec les champs requis : nom, prenom, email (valide), password (min 6 caractères), role, dtype. Voir exemples ci-dessous.",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @io.swagger.v3.oas.annotations.media.Schema(
+                    requiredProperties = {"email", "password", "role", "dtype"},
+                    implementation = Utilisateur.class,
+                    example = "{\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"email\": \"jean.dupont@example.com\",\n  \"password\": \"motdepasse123\",\n  \"role\": \"Utilisateur\",\n  \"dtype\": \"Utilisateur\"\n}"
+                ),
+                examples = {
+                    @ExampleObject(
+                        name = "Utilisateur",
+                        value = "{\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"email\": \"jean.dupont@example.com\",\n  \"password\": \"motdepasse123\",\n  \"role\": \"Utilisateur\",\n  \"dtype\": \"Utilisateur\"\n}"
+                    ),
+                    @ExampleObject(
+                        name = "Agent d'inventaire",
+                        value = "{\n  \"nom\": \"Martin\",\n  \"prenom\": \"Paul\",\n  \"email\": \"paul.martin@example.com\",\n  \"password\": \"motdepasse123\",\n  \"role\": \"AGENT_INVENTAIRE\",\n  \"dtype\": \"AgentInventaire\"\n}"
+                    ),
+                    @ExampleObject(
+                        name = "Administrateur client",
+                        value = "{\n  \"nom\": \"Durand\",\n  \"prenom\": \"Alice\",\n  \"email\": \"alice.durand@example.com\",\n  \"password\": \"motdepasse123\",\n  \"role\": \"ADMIN_CLIENT\",\n  \"dtype\": \"AdministrateurClient\"\n}"
+                    ),
+                    @ExampleObject(
+                        name = "Super administrateur",
+                        value = "{\n  \"nom\": \"Boss\",\n  \"prenom\": \"Super\",\n  \"email\": \"super.boss@example.com\",\n  \"password\": \"motdepasse123\",\n  \"role\": \"SUPER_ADMIN\",\n  \"dtype\": \"SuperAdministrateur\"\n}"
+                    )
+                }
+            )
+        )
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Utilisateur créé avec succès",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Réponse utilisateur créé",
+                    value = "{\n  \"id\": 10,\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"email\": \"jean.dupont@example.com\",\n  \"role\": \"Utilisateur\",\n  \"dtype\": \"Utilisateur\"\n}"
+                )
+            )
+        ),
+        @ApiResponse(responseCode = "400", description = "Erreur lors de la création de l'utilisateur",
+            content = @Content(
+                mediaType = "application/json",
+                examples = @ExampleObject(
+                    name = "Erreur création",
+                    value = "{\n  \"message\": \"Erreur création utilisateur: ...\"\n}"
+                )
+            )
+        )
+    })
+    @PostMapping("users/register")
+    public ResponseEntity<?> registerUser(@RequestBody Utilisateur user) {
         try {
-            agentService.assignAgentToPlan(agentId, planId);
-            return ResponseEntity.ok("Agent assigné au plan avec succès.");
+            if (user.getEmail() == null || user.getEmail().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "L'email est obligatoire."));
+            }
+            if (user.getPassword() == null || user.getPassword().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Le mot de passe est obligatoire."));
+            }
+            if (!user.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Format d'email invalide."));
+            }
+            if (user.getPassword().length() < 6) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Le mot de passe doit contenir au moins 6 caractères."));
+            }
+            if (user.getPassword() != null && !user.getPassword().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(user.getPassword()));
+            }
+            if (user.getUsername() == null || user.getUsername().isEmpty()) {
+                user.setUsername(user.getEmail());
+            }
+            if (user.getRole() == null) {
+                user.setRole(Role.Utilisateur);
+            }
+            Utilisateur saved = utilisateurRepository.save(user);
+            return ResponseEntity.ok(saved);
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("Erreur : " + e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", "Erreur création utilisateur: " + e.getMessage()));
         }
     }
-    @PostMapping("AgentInventaire/assign/{planId}/{agentId}/{zoneId}")
-    public ResponseEntity<?> assignAgentToPlan(
-            @PathVariable("planId") Long planId,
-            @PathVariable("agentId") Long agentId,
-            @PathVariable("zoneId") Long zoneId) {
-        try {
-            agentService.assignAgentToPlan(agentId, planId, zoneId);
-            return ResponseEntity.ok("Agent assigné au plan et à la zone avec succès.");
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body("Erreur : " + e.getMessage());
-        }
-    }
-    //test
+    //test version login lwla
     @Operation(
         summary = "Créer un compte administrateur client",
         description = "Crée un compte admin pour un client spécifique",
@@ -124,7 +193,7 @@ public class UtilisateurController {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
-    
+
     @Operation(
         summary = "Créer un compte agent d'inventaire",
         description = "Crée un compte agent pour un client spécifique",
@@ -213,6 +282,7 @@ public class UtilisateurController {
             userMap.put("prenom", user.getPrenom());
             userMap.put("email", user.getEmail());
             userMap.put("role", user.getRole() != null ? user.getRole() : Role.Utilisateur);
+
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("message", "Connexion réussie");
             responseMap.put("user", userMap);
@@ -275,7 +345,7 @@ public class UtilisateurController {
         try {
         Pageable pageable = PageRequest.of(page, size);
         Page<Utilisateur> userPage = utilisateurRepository.findAll(pageable);
-        
+
         List<Map<String, Object>> usersData = userPage.getContent().stream()
                 .map(user -> {
                     Map<String, Object> data = new HashMap<>();
@@ -285,7 +355,7 @@ public class UtilisateurController {
                     return data;
                 })
                 .collect(Collectors.toList());
-                
+
         return ResponseEntity.ok(usersData);
         } catch (Exception e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -4,6 +4,8 @@ import {
   Modal, ModalDialog
 } from '@mui/joy';
 import { useState, useEffect } from 'react';
+import { useFormik } from 'formik';
+import * as Yup from 'yup';
 import Sidebarsuper from '../components/Sidebar';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import axios from 'axios';
@@ -12,17 +14,6 @@ const AjouterProduit = () => {
   const [dragActive, setDragActive] = useState(false);
   const [importStatus, setImportStatus] = useState({ loading: false, error: '', success: '' });
   const [showImportModal, setShowImportModal] = useState(false);
-  const [product, setProduct] = useState({
-    nom: '',
-    description: '',
-    codeBarre: '',
-    reference: '',
-    prix: '',
-    unite: '',
-    quantitetheo: 0, // <-- champ aligné sur le backend
-    categorieId: '',
-    sousCategorieId: ''
-  });
   const [imageFile, setImageFile] = useState(null);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSubCategoryName, setNewSubCategoryName] = useState("");
@@ -108,51 +99,60 @@ const AjouterProduit = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const payload = {
-        nom: product.nom,
-        description: product.description,
-        CodeBarre: product.codeBarre, // C majuscule !
-        reference: product.reference,
-        prix: product.prix ? Number(product.prix) : undefined,
-        unite: product.unite,
-        quantitetheo: Number(product.quantitetheo), // <-- champ aligné sur le backend
-        category: product.categorieId ? { id: product.categorieId } : undefined,
-        subCategory: product.sousCategorieId ? { id: product.sousCategorieId } : undefined,
-      };
-      console.log('Payload envoyé au backend:', payload);
-      const { data, status } = await axios.post(
-        'http://localhost:8080/produits/register',
-        payload,
-        { headers }
-      );
-      if ((status === 200 || status === 201) && data.id) {
-        if (imageFile) {
-          await uploadProductImage(data.id);
+  const formik = useFormik({
+    initialValues: {
+      nom: '',
+      description: '',
+      codeBarre: '',
+      reference: '',
+      prix: '',
+      unite: '',
+      quantitetheo: 0,
+      categorieId: '',
+      sousCategorieId: ''
+    },
+    validationSchema: Yup.object({
+      nom: Yup.string().required('Nom requis'),
+      codeBarre: Yup.string().required('Code barre requis'),
+      reference: Yup.string().required('Référence requise'),
+      prix: Yup.number().typeError('Prix invalide').min(0, 'Prix >= 0').required('Prix requis'),
+      quantitetheo: Yup.number().typeError('Quantité invalide').min(0, 'Quantité >= 0').required('Quantité requise'),
+      categorieId: Yup.string().required('Catégorie requise'),
+    }),
+    onSubmit: async (values, { resetForm }) => {
+      setLoading(true);
+      try {
+        const payload = {
+          nom: values.nom,
+          description: values.description,
+          CodeBarre: values.codeBarre,
+          reference: values.reference,
+          prix: values.prix ? Number(values.prix) : undefined,
+          unite: values.unite,
+          quantitetheo: Number(values.quantitetheo),
+          category: values.categorieId ? { id: values.categorieId } : undefined,
+          subCategory: values.sousCategorieId ? { id: values.sousCategorieId } : undefined,
+        };
+        const { data, status } = await axios.post(
+          'http://localhost:8080/produits/register',
+          payload,
+          { headers }
+        );
+        if ((status === 200 || status === 201) && data.id) {
+          if (imageFile) {
+            await uploadProductImage(data.id);
+          }
+          alert('Produit ajouté avec succès');
+          resetForm();
+          setImageFile(null);
         }
-        alert('Produit ajouté avec succès');
-        setProduct({
-          nom: '',
-          description: '',
-          codeBarre: '',
-          reference: '',
-          prix: '',
-          unite: '',
-          quantitetheo: 0,
-          categorieId: '',
-          sousCategorieId: ''
-        });
-        setImageFile(null);
+      } catch (error) {
+        console.error('Error adding product:', error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error adding product:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
   const handleFileImport = async (file) => {
     if (!file) return;
@@ -318,14 +318,30 @@ const AjouterProduit = () => {
               </Alert>
             ) : (
               <Stack spacing={3}>
-                <FormControl required>
+                <FormControl required error={formik.touched.nom && Boolean(formik.errors.nom)}>
                   <FormLabel>Nom du produit</FormLabel>
                   <Input
+                    name="nom"
                     placeholder="Entrez le nom du produit"
                     variant="outlined"
                     sx={{ bgcolor: 'background.body' }}
-                    value={product.nom}
-                    onChange={(e) => setProduct({...product, nom: e.target.value})}
+                    value={formik.values.nom}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
+                  />
+                  {formik.touched.nom && formik.errors.nom && (
+                    <Typography color="danger" level="body-sm">{formik.errors.nom}</Typography>
+                  )}
+                </FormControl>
+                <FormControl>
+                  <FormLabel>Description</FormLabel>
+                  <Input
+                    name="description"
+                    placeholder="Entrez la description du produit"
+                    variant="outlined"
+                    sx={{ bgcolor: 'background.body' }}
+                    value={formik.values.description}
+                    onChange={formik.handleChange}
                   />
                 </FormControl>
                 <FormControl>
@@ -336,50 +352,68 @@ const AjouterProduit = () => {
                     onChange={handleImageChange}
                   />
                 </FormControl>
-                <FormControl required>
+                <FormControl required error={formik.touched.codeBarre && Boolean(formik.errors.codeBarre)}>
                   <FormLabel>Code barre</FormLabel>
                   <Input
+                    name="codeBarre"
                     placeholder="Scanner ou entrer le code barre"
                     variant="outlined"
                     sx={{ bgcolor: 'background.body' }}
-                    value={product.codeBarre}
-                    onChange={(e) => setProduct({...product, codeBarre: e.target.value})}
+                    value={formik.values.codeBarre}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                   />
+                  {formik.touched.codeBarre && formik.errors.codeBarre && (
+                    <Typography color="danger" level="body-sm">{formik.errors.codeBarre}</Typography>
+                  )}
                 </FormControl>
-                <FormControl required>
+                <FormControl required error={formik.touched.reference && Boolean(formik.errors.reference)}>
                   <FormLabel>Référence</FormLabel>
                   <Input
+                    name="reference"
                     placeholder="Entrer la référence du produit"
                     variant="outlined"
                     sx={{ bgcolor: 'background.body' }}
-                    value={product.reference}
-                    onChange={e => setProduct({ ...product, reference: e.target.value })}
+                    value={formik.values.reference}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                   />
+                  {formik.touched.reference && formik.errors.reference && (
+                    <Typography color="danger" level="body-sm">{formik.errors.reference}</Typography>
+                  )}
                 </FormControl>
-                <FormControl required>
+                <FormControl required error={formik.touched.prix && Boolean(formik.errors.prix)}>
                   <FormLabel>Prix</FormLabel>
                   <Input
+                    name="prix"
                     type="number"
                     placeholder="Entrer le prix du produit"
                     variant="outlined"
                     sx={{ bgcolor: 'background.body' }}
-                    value={product.prix}
-                    onChange={e => setProduct({ ...product, prix: e.target.value })}
+                    value={formik.values.prix}
+                    min={0}
+                    onChange={formik.handleChange}
+                    onBlur={formik.handleBlur}
                   />
+                  {formik.touched.prix && formik.errors.prix && (
+                    <Typography color="danger" level="body-sm">{formik.errors.prix}</Typography>
+                  )}
                 </FormControl>
 
                 <Box sx={{ display: 'flex', gap: 2 }}>
-                  <FormControl required sx={{ flex: 1 }}>
+                  <FormControl required sx={{ flex: 1 }} error={formik.touched.categorieId && Boolean(formik.errors.categorieId)}>
                     <FormLabel>Catégorie</FormLabel>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Select
+                        name="categorieId"
                         placeholder="Sélectionnez une catégorie"
                         color="primary"
                         variant="soft"
                         size="lg"
-                        value={product.categorieId}
+                        value={formik.values.categorieId}
                         onChange={(_, value) => {
-                          setProduct({ ...product, categorieId: value, sousCategorieId: '' });
+                          formik.setFieldValue('categorieId', value);
+                          formik.setFieldValue('sousCategorieId', '');
                           fetchSousCategories(value);
                         }}
                         sx={{ flex: 1 }}
@@ -406,26 +440,36 @@ const AjouterProduit = () => {
                         +
                       </Button>
                     </Box>
+                    {formik.touched.categorieId && formik.errors.categorieId && (
+                      <Typography color="danger" level="body-sm">{formik.errors.categorieId}</Typography>
+                    )}
                   </FormControl>
 
-                  <FormControl sx={{ flex: 1 }}>
+                  <FormControl sx={{ flex: 1 }} error={formik.touched.quantitetheo && Boolean(formik.errors.quantitetheo)}>
                     <FormLabel>Quantité</FormLabel>
                     <Input
+                      name="quantitetheo"
                       type="number"
                       sx={{ bgcolor: 'background.body' }}
-                      value={product.quantitetheo}
-                      onChange={(e) => setProduct({...product, quantitetheo: Number(e.target.value)})}
+                      value={formik.values.quantitetheo}
+                      min={0}
+                      onChange={formik.handleChange}
+                      onBlur={formik.handleBlur}
                     />
+                    {formik.touched.quantitetheo && formik.errors.quantitetheo && (
+                      <Typography color="danger" level="body-sm">{formik.errors.quantitetheo}</Typography>
+                    )}
                   </FormControl>
                 </Box>
 
-                {product.categorieId && (
+                {formik.values.categorieId && (
                   <FormControl>
                     <FormLabel>Sous-catégorie</FormLabel>
                     <Box sx={{ display: 'flex', gap: 1 }}>
                       <Select
-                        value={product.sousCategorieId || ''}
-                        onChange={(_, value) => setProduct({ ...product, sousCategorieId: value })}
+                        name="sousCategorieId"
+                        value={formik.values.sousCategorieId || ''}
+                        onChange={(_, value) => formik.setFieldValue('sousCategorieId', value)}
                         required
                         sx={{ flex: 1 }}
                       >
@@ -467,17 +511,8 @@ const AjouterProduit = () => {
                     variant="outlined" 
                     color="neutral" 
                     onClick={() => {
-                      setProduct({
-                        nom: '',
-                        description: '',
-                        codeBarre: '',
-                        reference: '',
-                        prix: '',
-                        unite: '',
-                        quantitetheo: 0,
-                        categorieId: '',
-                        sousCategorieId: ''
-                      });
+                      formik.resetForm();
+                      setImageFile(null);
                     }}
                   >
                     Annuler
@@ -487,7 +522,8 @@ const AjouterProduit = () => {
                     loading={loading}
                     size="lg"
                     color="primary"
-                    onClick={handleSubmit}
+                    onClick={formik.handleSubmit}
+                    disabled={loading || !formik.isValid || !formik.dirty}
                   >
                     Ajouter le produit
                   </Button>

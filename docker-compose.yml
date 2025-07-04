@@ -10,7 +10,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root
     ports:
-      - "5000:5432"
+      - "5432:5000"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +28,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/Gest
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5000/Gest
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
     ports:
@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: react_frontend
     ports:
-      - "3000:3000"
+      - "3000:5173"
     depends_on:
       - backend
 

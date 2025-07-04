@@ -220,14 +220,73 @@ public class ProduitController {
             @ApiResponse(responseCode = "200", description = "Produit mis à jour avec succès"),
             @ApiResponse(responseCode = "404", description = "Produit non trouvé")
     })
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateProduit(@PathVariable Long id, @RequestBody Produit produit){
-        if (!produitRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
+    @PutMapping(value = "/{id}", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.MULTIPART_FORM_DATA_VALUE})
+    @Transactional
+    public ResponseEntity<?> updateProduitWithImage(
+            @PathVariable Long id,
+            @RequestBody(required = false) Produit produit,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+        try {
+            if (!produitRepository.existsById(id)) {
+                return ResponseEntity.notFound().build();
+            }
+            produit.setId(id);
+            Produit updatedProduit = produitRepository.save(produit);
+            if (imageFile != null && !imageFile.isEmpty()) {
+                produitImageService.uploadProductImage(id, imageFile);
+            }
+            return ResponseEntity.ok(updatedProduit);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur lors de la mise à jour du produit: " + e.getMessage());
         }
-        produit.setId(id);
-        Produit produit1 = produitRepository.save(produit);
-        return ResponseEntity.ok(produit1);
+    }
+
+    @PostMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<?> updateProduitWithImagePost(
+            @PathVariable Long id,
+            @RequestPart("produit") Produit produit,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+        try {
+            if (!produitRepository.existsById(id)) {
+                return ResponseEntity.notFound().build();
+            }
+            produit.setId(id);
+            Produit updatedProduit = produitRepository.save(produit);
+            if (imageFile != null && !imageFile.isEmpty()) {
+                produitImageService.uploadProductImage(id, imageFile);
+            }
+            return ResponseEntity.ok(updatedProduit);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur lors de la mise à jour du produit: " + e.getMessage());
+        }
+    }
+
+    @PatchMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    public ResponseEntity<?> patchProduitWithImage(
+            @PathVariable Long id,
+            @RequestPart("produit") Produit produit,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile) {
+        try {
+            if (!produitRepository.existsById(id)) {
+                return ResponseEntity.notFound().build();
+            }
+            produit.setId(id);
+            Produit updatedProduit = produitRepository.save(produit);
+            if (imageFile != null && !imageFile.isEmpty()) {
+                produitImageService.uploadProductImage(id, imageFile);
+            }
+            return ResponseEntity.ok(updatedProduit);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur lors de la mise à jour du produit: " + e.getMessage());
+        }
     }
 
     @Operation(summary = "Rechercher des produits")
@@ -294,7 +353,7 @@ public class ProduitController {
             @ApiResponse(responseCode = "200", description = "insértion avec succès"),
             @ApiResponse(responseCode = "500", description = "Erreur serveur lors de l'insertion d'images")
     })
-    @PostMapping("/{produitId}/image")
+    @PutMapping("/{produitId}/image")
     public ResponseEntity<?> uploadProductImage(
             @PathVariable("produitId") Long produitId,
             @RequestParam("image") MultipartFile file) throws IOException {
@@ -304,6 +363,7 @@ public class ProduitController {
         return ResponseEntity.status(HttpStatus.OK)
                 .body(response);
     }
+
     @Operation(summary = "Obtenir les images des produits")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "récupération avec succès"),
@@ -511,14 +571,12 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
         dto.setQuantitetheo(produit.getQuantitetheo());
         dto.setDatecremod(produit.getDatecremod());
         dto.setImageUrl(produit.getImageUrl());
-        // Add base64 image data if available
         if (produit.getId() != null && produit.getImageUrl() != null && !produit.getImageUrl().isEmpty()) {
             try {
                 byte[] imageData = produitImageService.getProductImage(produit.getId());
                 String base64Image = java.util.Base64.getEncoder().encodeToString(imageData);
                 dto.setImageData(base64Image);
             } catch (Exception e) {
-                // Optionally log error
             }
         }
 
@@ -628,14 +686,10 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
 
             Produit produit = produitOpt.get();
             Zone zone = zoneOpt.get();
-
-            // Vérifier que le produit appartient à la zone
             if (!zone.getProduits().contains(produit)) {
                 return ResponseEntity.badRequest()
                     .body(Map.of("error", "Le produit n'appartient pas à cette zone"));
             }
-
-            // Rechercher le lien ZoneProduit correspondant
             ZoneProduit targetZp = null;
             for (ZoneProduit zp : produit.getZoneProduits()) {
                 if (zp.getZone().getId().equals(zoneId)) {
@@ -649,9 +703,6 @@ public ResponseEntity<List<ProduitDTO>> getAllProduits(
             }
             targetZp.setQuantiteTheorique(newQuantity);
 
-            if ("VERIFIE".equalsIgnoreCase(status)) {
-                targetZp.setVerified(true);
-            }
 
             int totalQuantite = produit.getZoneProduits().stream()
                     .map(ZoneProduit::getQuantiteTheorique)

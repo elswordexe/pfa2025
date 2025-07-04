@@ -90,18 +90,19 @@ const PlanStatusChart = () => {
         boxShadow: "sm",
         bgcolor: "#FFFFFF",
         p: 2,
-        width: { xs: "100%", sm: 300, md: 320 },
+        width: { xs: "100%", sm: 400, md: 440 },
         maxWidth: '100%',
-        height: { xs: "auto", sm: 320 },
+        height: { xs: "auto", sm: 385 },
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
+        ml: { xs: 0, md: 43 },
       }}
     >
       <Typography level="title-sm" fontWeight={600} mb={1}>
         Plans par statut
       </Typography>
-      <Box sx={{ width: "100%", height: 220 }}>
+      <Box sx={{ width: "100%", height: 320 }}>
         <Doughnut data={chartData} options={options} />
       </Box>
       {isEmpty && (

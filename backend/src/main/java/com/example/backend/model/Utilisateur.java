@@ -28,9 +28,9 @@ import java.util.List;
         visible = true
 )
 @JsonSubTypes({
-        @JsonSubTypes.Type(value = AdministrateurClient.class, name = "AdministrateurClient"),
-        @JsonSubTypes.Type(value = SuperAdministrateur.class, name = "SuperAdministrateur"),
-        @JsonSubTypes.Type(value = AgentInventaire.class, name = "AgentInventaire"),
+        @JsonSubTypes.Type(value = AdministrateurClient.class, name = "ADMIN_CLIENT"),
+        @JsonSubTypes.Type(value = SuperAdministrateur.class, name = "SUPER_ADMIN"),
+        @JsonSubTypes.Type(value = AgentInventaire.class, name = "AGENT_INVENTAIRE"),
         @JsonSubTypes.Type(value = Client.class, name = "Client")
 })
 

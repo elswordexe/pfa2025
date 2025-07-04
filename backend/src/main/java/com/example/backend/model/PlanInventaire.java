@@ -2,8 +2,6 @@ package com.example.backend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -50,7 +48,6 @@ public class PlanInventaire {
         inverseJoinColumns = @JoinColumn(name = "produit_id")
     )
     private Set<Produit> produits = new HashSet<>();
-
     private boolean inclusTousProduits = true;
 
     @OneToMany(mappedBy = "planInventaire", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

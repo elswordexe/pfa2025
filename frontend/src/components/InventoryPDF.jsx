@@ -83,7 +83,13 @@ const styles = StyleSheet.create({
   },
 });
 
-const InventoryPDF = ({ planId, zones }) => {
+const InventoryPDF = ({ planId, zones, validatedProducts = [] }) => {
+  const validatedMap = {};
+  validatedProducts.forEach(vp => {
+    const key = `${vp.id}-${vp.validatedZone || vp.zoneId}`;
+    validatedMap[key] = vp;
+  });
+
   return (
     <PDFViewer style={styles.viewer}>
       <Document>
@@ -105,38 +111,115 @@ const InventoryPDF = ({ planId, zones }) => {
                   <Text style={[styles.tableCell, styles.productCell]}>Produit</Text>
                   <Text style={[styles.tableCell, styles.codeCell]}>Code Barre</Text>
                   <Text style={[styles.tableCell, styles.qtyCell]}>Théorique</Text>
+                  <Text style={[styles.tableCell, styles.qtyCell]}>Qté Avant Validation</Text>
                   <Text style={[styles.tableCell, styles.qtyCell]}>Manuel</Text>
                   <Text style={[styles.tableCell, styles.qtyCell]}>Scan</Text>
+                  <Text style={[styles.tableCell, styles.qtyCell]}>Écart</Text>
                   <Text style={[styles.tableCell, styles.statusCell]}>État</Text>
                 </View>
 
                 {/* Table Body */}
                 {zone.zoneProduits?.map((product) => {
-                  const ecart = (product.quantiteManuelle || product.quantiteScan || 0) - product.quantiteTheorique;
-                  const status = ecart === 0 ? 'Conforme' : ecart > 0 ? 'Surplus' : 'Manquant';
-
-                  return (
-                    <View key={product.id} style={styles.tableRow}>
-                      <Text style={[styles.tableCell, styles.productCell]}>
-                        {product.nom || '-'}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.codeCell]}>
-                        {product.codeBarre || '-'}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.qtyCell]}>
-                        {product.quantiteTheorique || '0'}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.qtyCell]}>
-                        {product.quantiteManuelle || '-'}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.qtyCell]}>
-                        {product.quantiteScan || '-'}
-                      </Text>
-                      <Text style={[styles.tableCell, styles.statusCell]}>
-                        {status}
-                      </Text>
-                    </View>
-                  );
+                  const key = `${product.id}-${zone.id}`;
+                  const validated = validatedMap[key];
+                  let status = '';
+                  let quantiteValidee = '-';
+                  let quantiteTheorique = product.quantiteTheorique || '0';
+                  let quantiteAvantValidation = '';
+                  let ecart = '-';
+                  if (validated) {
+                    status = 'Validé';
+                    quantiteValidee = validated.quantiteValidee ?? validated.quantite ?? '-';
+                    if (validated.quantiteAvantValidation !== undefined) {
+                      quantiteAvantValidation = validated.quantiteAvantValidation;
+                    } else if (validated.oldQuantiteAvant !== undefined) {
+                      quantiteAvantValidation = validated.oldQuantiteAvant;
+                    } else {
+                      quantiteAvantValidation = '';
+                    }
+                    if (
+                      quantiteValidee !== undefined && quantiteValidee !== '-' &&
+                      quantiteAvantValidation !== undefined && quantiteAvantValidation !== '' && quantiteAvantValidation !== '-'
+                    ) {
+                      ecart = Number(quantiteValidee) - Number(quantiteAvantValidation);
+                    }
+                    return (
+                      <View key={product.id} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, styles.productCell]}>
+                          {product.nom || '-'}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.codeCell]}>
+                          {product.codeBarre || '-'}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                          {quantiteAvantValidation}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                          {quantiteValidee}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                        </Text>
+                        <Text style={[
+                          styles.tableCell,
+                          styles.qtyCell,
+                          ecart !== '-' && !isNaN(ecart)
+                            ? (ecart > 0
+                                ? { color: '#16a34a', fontWeight: 'bold' }
+                                : (ecart < 0
+                                    ? { color: '#dc2626', fontWeight: 'bold' } 
+                                    : { color: '#1f2937', fontWeight: 'bold' })) 
+                            : { color: '#1f2937' }
+                        ]}>
+                          {ecart}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.statusCell]}>
+                          {status}
+                        </Text>
+                      </View>
+                    );
+                  } else {
+                    const ecart = (product.quantiteManuelle || product.quantiteScan || 0) - product.quantiteTheorique;
+                    status = ecart === 0 ? 'Conforme' : ecart > 0 ? 'Surplus' : 'Manquant';
+                    return (
+                      <View key={product.id} style={styles.tableRow}>
+                        <Text style={[styles.tableCell, styles.productCell]}>
+                          {product.nom || '-'}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.codeCell]}>
+                          {product.codeBarre || '-'}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                          {quantiteTheorique}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                          {product.quantiteManuelle || '-'}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.qtyCell]}>
+                          {product.quantiteScan || '-'}
+                        </Text>
+                        <Text style={[
+                          styles.tableCell,
+                          styles.qtyCell,
+                          ecart !== '-' && !isNaN(ecart)
+                            ? (ecart > 0
+                                ? { color: '#16a34a', fontWeight: 'bold' }
+                                : (ecart < 0
+                                    ? { color: '#dc2626', fontWeight: 'bold' }
+                                    : { color: '#1f2937', fontWeight: 'bold' }))
+                            : { color: '#1f2937' }
+                        ]}>
+                          {ecart}
+                        </Text>
+                        <Text style={[styles.tableCell, styles.statusCell]}>
+                          {status}
+                        </Text>
+                      </View>
+                    );
+                  }
                 })}
               </View>
             </View>

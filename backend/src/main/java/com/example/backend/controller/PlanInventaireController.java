@@ -1,10 +1,14 @@
+
 package com.example.backend.controller;
 
 import com.example.backend.dto.PlanInventaireDTO;
 import com.example.backend.model.*;
 import com.example.backend.repository.*;
-import com.example.backend.service.PlanInventaireService;
+import com.example.backend.model.ZoneProduitPlanValide;
+import com.example.backend.repository.ZoneProduitPlanValideRepository;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
 import com.example.backend.model.AdministrateurClient;
 
 @RestController
@@ -35,23 +38,128 @@ import com.example.backend.model.AdministrateurClient;
 @Tag(name = "Plan d'Inventaire", description = "API de gestion des plans d'inventaire")
 @Slf4j
 @RequiredArgsConstructor
+
 public class PlanInventaireController {
 
-    private final PlanInventaireService planInventaireService;
-    @Autowired
     private final PlanInventaireRepository planInventaireRepository;
-    @Autowired
     private final ProduitRepository produitRepository;
-    @Autowired
     private final ZoneRepository zoneRepository;
-    @Autowired
     private final UtilisateurRepository utilisateurRepository;
-    @Autowired
     private final AssignationAgentRepository assignationAgentRepository;
-    @Autowired
     private final EcartRepository ecartRepository;
-    @Autowired
     private final CheckupRepository checkupRepository;
+    private final ZoneProduitPlanValideRepository zoneProduitPlanValideRepository;
+    private final ZoneProduitRepository zoneProduitRepository;
+    @PutMapping("/{planId}/produits/{produitId}/zones/{zoneId}/valider")
+    public ResponseEntity<?> validerProduitPourPlanZoneNouveau(@PathVariable Long planId,
+                                                              @PathVariable Long produitId,
+                                                              @PathVariable Long zoneId,
+                                                              @RequestBody(required = false) Map<String, Object> body,
+                                                              Authentication authentication) {
+        try {
+            PlanInventaire plan = planInventaireRepository.findById(planId)
+                    .orElseThrow(() -> new EntityNotFoundException("Plan non trouvé avec l'id: " + planId));
+            Produit produit = produitRepository.findById(produitId)
+                    .orElseThrow(() -> new EntityNotFoundException("Produit non trouvé avec l'id: " + produitId));
+            Zone zone = zoneRepository.findById(zoneId)
+                    .orElseThrow(() -> new EntityNotFoundException("Zone non trouvée avec l'id: " + zoneId));
+
+            Integer quantiteValidee = null;
+            if (body != null && body.containsKey("quantiteValidee")) {
+                Object q = body.get("quantiteValidee");
+                if (q instanceof Number) {
+                    quantiteValidee = ((Number) q).intValue();
+                } else if (q instanceof String) {
+                    try {
+                        quantiteValidee = Integer.parseInt((String) q);
+                    } catch (NumberFormatException ignored) {}
+                }
+            }
+
+            Long userId = null;
+            if (authentication != null) {
+                String email = authentication.getName();
+                Utilisateur user = utilisateurRepository.findByEmail(email).orElse(null);
+                if (user != null) userId = user.getId();
+            }
+            ZoneProduitPlanValide zpValide = zoneProduitPlanValideRepository.findByPlanAndZoneAndProduit(plan, zone, produit)
+                    .orElse(null);
+
+            ZoneProduit zoneProduit = null;
+            if (zone.getZoneProduits() != null) {
+                for (ZoneProduit zp : zone.getZoneProduits()) {
+                    if (zp.getProduit() != null && zp.getProduit().getId().equals(produitId)) {
+                        zoneProduit = zp;
+                        break;
+                    }
+                }
+            }
+            Integer oldQuantite = zoneProduit != null ? zoneProduit.getQuantiteTheorique() : null;
+
+            if (zpValide == null) {
+                zpValide = ZoneProduitPlanValide.builder()
+                        .plan(plan)
+                        .zone(zone)
+                        .produit(produit)
+                        .quantiteValidee(quantiteValidee)
+                        .dateValidation(java.time.LocalDateTime.now())
+                        .validatedByUserId(userId)
+                        .oldQuantiteAvant(oldQuantite)
+                        .build();
+            } else {
+                zpValide.setQuantiteValidee(quantiteValidee);
+                zpValide.setDateValidation(java.time.LocalDateTime.now());
+                zpValide.setValidatedByUserId(userId);
+                if (zpValide.getOldQuantiteAvant() == null) {
+                    zpValide.setOldQuantiteAvant(oldQuantite);
+                }
+            }
+
+            zoneProduitPlanValideRepository.save(zpValide);
+            if (zoneProduit != null && quantiteValidee != null) {
+                zoneProduit.setQuantiteTheorique(quantiteValidee);
+                zoneProduitRepository.save(zoneProduit);
+                if (produit.getQuantitetheo() != null && quantiteValidee > produit.getQuantitetheo()) {
+                    produit.setQuantitetheo(quantiteValidee);
+                    produitRepository.save(produit);
+                }
+            }
+
+            boolean allValidated = true;
+            for (Produit p : plan.getProduits()) {
+                for (Zone z : plan.getZones()) {
+                    boolean hasZoneProduit = false;
+                    if (z.getZoneProduits() != null) {
+                        for (ZoneProduit zp : z.getZoneProduits()) {
+                            if (zp.getProduit() != null && zp.getProduit().getId().equals(p.getId())) {
+                                hasZoneProduit = true;
+                                ZoneProduitPlanValide zpv = zoneProduitPlanValideRepository.findByPlanAndZoneAndProduit(plan, z, p).orElse(null);
+                                if (zpv == null) {
+                                    allValidated = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    if (!hasZoneProduit) continue;
+                    if (!allValidated) break;
+                }
+                if (!allValidated) break;
+            }
+            if (allValidated) {
+                plan.setStatut(STATUS.Termine);
+            } else {
+                plan.setStatut(STATUS.EN_cours);
+            }
+            planInventaireRepository.save(plan);
+
+            return ResponseEntity.ok(Map.of("message", "Produit validé pour le plan et la zone (nouveau système)", "id", zpValide.getId()));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 
     @Operation(summary = "Lister tous les plan")
     @ApiResponses(value =
@@ -220,29 +328,23 @@ public class PlanInventaireController {
 
         return ResponseEntity.ok().build();
     }
-    @Operation(summary = "mise a jour du plan", description = "update du plan")
+    @Operation(summary = "Assigner un agent", description = "Assigner un plan à un agent")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "mise a jour du plan avec succès"),
-            @ApiResponse(responseCode = "400", description = "errur")
-    })
-    @PutMapping("{planId}")
-    public ResponseEntity<?> modifierPlan(@PathVariable Long planId, @RequestBody PlanInventaire planInventaire) {
-        if (!planId.equals(planInventaire.getId())) {
-            return ResponseEntity.badRequest().build();
-        }
-        PlanInventaire plan = planInventaireRepository.save(planInventaire);
-        return ResponseEntity.ok(plan);
-    }
-    @Operation(summary = "assigner un agent ", description = "assigner un aplan a un agent")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "agent assigne  avec succès"),
-            @ApiResponse(responseCode = "400", description = "failure d'assignations")
+            @ApiResponse(responseCode = "201", description = "Agent assigné avec succès",
+                    content = @Content(array = @ArraySchema(schema = @Schema(implementation = PlanInventaireDTO.AssignationAgentDTO.class)))),
+            @ApiResponse(responseCode = "400", description = "Échec d'assignation"),
+            @ApiResponse(responseCode = "403", description = "Accès non autorisé")
     })
     @PostMapping("{planId}/agents/{agentId}/assignations")
-    public ResponseEntity<?> assignerAgents(@PathVariable Long planId,
-                                            @PathVariable Long agentId,
-                                            @RequestBody(required = false) Zone zone,
-                                            Authentication authentication) {
+    public ResponseEntity<?> assignerAgents(
+            @Parameter(description = "ID du plan d'inventaire") @PathVariable Long planId,
+            @Parameter(description = "ID de l'agent à assigner") @PathVariable Long agentId,
+            @Parameter(description = "Zone à assigner (optionnel). Si non fourni, toutes les zones du plan seront assignées",
+                    required = false,
+                    schema = @Schema(implementation = Zone.class))
+            @RequestBody(required = false) Zone zone,
+            Authentication authentication)
+    {
         try {
             Utilisateur user = utilisateurRepository.findByEmail(authentication.getName())
                     .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
@@ -491,34 +593,34 @@ public class PlanInventaireController {
         List<Produit> updatedProducts = new ArrayList<>();
         List<Zone> zonesToSave = new ArrayList<>();
 
-        for (Map<String, Object> productData : productsWithZones) {
-            Long productId = Long.valueOf(productData.get("productId").toString());
-            List<Object> rawZoneIds = (List<Object>) productData.get("zoneIds");
-            List<Long> zoneIds = rawZoneIds.stream()
-                .map(id -> Long.valueOf(id.toString()))
-                .collect(Collectors.toList());
+            for (Map<String, Object> productData : productsWithZones) {
+                Long productId = Long.valueOf(productData.get("productId").toString());
+                List<Object> rawZoneIds = (List<Object>) productData.get("zoneIds");
+                List<Long> zoneIds = rawZoneIds.stream()
+                        .map(id -> Long.valueOf(id.toString()))
+                        .collect(Collectors.toList());
 
-            Produit produit = produitRepository.findById(productId)
-                    .orElseThrow(() -> new EntityNotFoundException("Produit non trouvé: " + productId));
+                Produit produit = produitRepository.findById(productId)
+                        .orElseThrow(() -> new EntityNotFoundException("Produit non trouvé: " + productId));
 
-            for (Zone existingZone : new ArrayList<>(produit.getZones())) {
-                existingZone.getProduits().remove(produit);
-                produit.getZones().remove(existingZone);
+                for (Long zoneId : zoneIds) {
+                    Zone zone = zoneRepository.findById(zoneId)
+                            .orElseThrow(() -> new EntityNotFoundException("Zone non trouvée: " + zoneId));
+
+                    if (!produit.getZones().contains(zone)) {
+                        produit.getZones().add(zone);
+                    }
+                    if (!zone.getProduits().contains(produit)) {
+                        zone.getProduits().add(produit);
+                    }
+                    zonesToSave.add(zone);
+                }
+
+                updatedProducts.add(produit);
+                if (!plan.getProduits().contains(produit)) {
+                    plan.getProduits().add(produit);
+                }
             }
-
-            for (Long zoneId : zoneIds) {
-                Zone zone = zoneRepository.findById(zoneId)
-                        .orElseThrow(() -> new EntityNotFoundException("Zone non trouvée: " + zoneId));
-                produit.getZones().add(zone);
-                zone.getProduits().add(produit);
-                zonesToSave.add(zone);
-            }
-
-            updatedProducts.add(produit);
-            if (!plan.getProduits().contains(produit)) {
-                plan.getProduits().add(produit);
-            }
-        }
 
         zoneRepository.saveAll(zonesToSave);
         produitRepository.saveAll(updatedProducts);
@@ -754,42 +856,27 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
                 .orElseThrow(() -> new EntityNotFoundException("Plan not found with id: " + planId));
             Map<Long, List<Map<String, Object>>> zoneProducts = new HashMap<>();
 
+            Set<Produit> planProduits = plan.getProduits();
             for (Zone zone : plan.getZones()) {
-                List<Produit> zoneProduits = zone.getProduits();
-                zoneProduits = zoneProduits.stream()
-                    .filter(prd -> {
-                        return prd.getZoneProduits().stream()
-                            .filter(zp -> zp.getZone().getId().equals(zone.getId()))
-                            .noneMatch(ZoneProduit::isVerified);
-                    })
-                    .toList();
-                
                 List<Map<String, Object>> produits = new ArrayList<>();
-                
-                Set<Produit> planProduits = plan.getProduits();
-                for (Produit produit : zoneProduits.stream().filter(planProduits::contains).toList()) {
+                for (Produit produit : zone.getProduits()) {
+                    if (!planProduits.contains(produit)) continue;
+                    ZoneProduit zoneProduit = produit.getZoneProduits().stream()
+                        .filter(zp -> zp.getZone().getId().equals(zone.getId()) && zp.getProduit().getId().equals(produit.getId()))
+                        .findFirst().orElse(null);
                     Map<String, Object> produitMap = new HashMap<>();
                     produitMap.put("id", produit.getId());
                     produitMap.put("nom", produit.getNom());
                     produitMap.put("codeBarre", produit.getCodeBarre());
-                    produitMap.put("quantitetheo", 0);
+                    produitMap.put("quantiteTheorique", zoneProduit != null ? zoneProduit.getQuantiteTheorique() : 0);
                     produits.add(produitMap);
                 }
-                
                 zoneProducts.put(zone.getId(), produits);
             }
-            
             return ResponseEntity.ok(zoneProducts);
-            
         } catch (EntityNotFoundException e) {
             return ResponseEntity.notFound().build();
         }
-    }
-
-    @GetMapping("/createdby/{userId}")
-    public ResponseEntity<List<PlanInventaire>> getPlansByCreateur(@PathVariable Long userId) {
-        List<PlanInventaire> plans = planInventaireRepository.findByCreateurId(userId);
-        return ResponseEntity.ok(plans);
     }
 
     private LocalDateTime parseDateTime(String input) {
@@ -812,25 +899,20 @@ private PlanInventaireDTO.ProduitDTO convertProduitToDTO(Produit produit) {
         PlanInventaire plan = planInventaireRepository.findById(planId)
                 .orElseThrow(() -> new EntityNotFoundException("Plan not found with id: " + planId));
 
-        List<Checkup> checkups = checkupRepository.findByPlanId(planId);
+        List<ZoneProduitPlanValide> validatedList = zoneProduitPlanValideRepository.findByPlan(plan);
         List<Map<String, Object>> validated = new ArrayList<>();
-        for (Checkup checkup : checkups) {
-            if (!checkup.isValide()) continue;
-            for (CheckupDetail detail : checkup.getDetails()) {
-                if (detail.getProduit() == null || !plan.getProduits().contains(detail.getProduit())) continue;
-                if (detail.getZone() == null) continue;
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", detail.getProduit().getId());
-                map.put("nom", detail.getProduit().getNom());
-                map.put("codeBarre", detail.getProduit().getCodeBarre());
-                map.put("validatedZone", detail.getZone().getId());
-                Integer qv = detail.getManualQuantity() != null ? detail.getManualQuantity() :
-                        (detail.getScannedQuantity() != null ? detail.getScannedQuantity() : 0);
-                map.put("quantiteValidee", qv);
-                validated.add(map);
-            }
+        for (ZoneProduitPlanValide zpValide : validatedList) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", zpValide.getProduit().getId());
+            map.put("nom", zpValide.getProduit().getNom());
+            map.put("codeBarre", zpValide.getProduit().getCodeBarre());
+            map.put("validatedZone", zpValide.getZone().getId());
+            map.put("quantiteValidee", zpValide.getQuantiteValidee());
+            map.put("oldQuantiteAvant", zpValide.getOldQuantiteAvant());
+            map.put("dateValidation", zpValide.getDateValidation());
+            map.put("validatedByUserId", zpValide.getValidatedByUserId());
+            validated.add(map);
         }
         return ResponseEntity.ok(validated);
     }
-
 }
